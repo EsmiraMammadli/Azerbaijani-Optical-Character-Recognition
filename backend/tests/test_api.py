@@ -174,6 +174,7 @@ def _mail_on(monkeypatch):
     sent = []
     monkeypatch.setattr(main, "APP_PASSWORD", "sirr")
     monkeypatch.setattr(main, "MAIL_CONSOLE", True)
+    monkeypatch.setattr(main, "REQUIRE_VERIFIED", False)   # köhnə axın testləri: təsdiq məcburi deyil
     monkeypatch.setattr(main, "send_mail", lambda to, subject, text, html: sent.append((to, subject, text)))
     main._RESET_SENT.clear()
     main._VERIFY_SENT.clear()
@@ -463,3 +464,66 @@ def test_job_merge_and_unknown_job():
     assert len(job["results"]) == 1 and "bir" in job["results"][0]["text"]
     assert client.get("/api/jobs/yoxdur").status_code == 404
     assert client.delete("/api/jobs/yoxdur").status_code == 404
+
+def test_verification_required_before_login(monkeypatch):
+    sent = _mail_on(monkeypatch)
+    monkeypatch.setattr(main, "REQUIRE_VERIFIED", True)
+
+    # qeydiyyat nişan vermir, yalnız təsdiq məktubu göndərir
+    r = _register("mecburi1", email="mecburi1@example.com")
+    assert r.status_code == 200 and r.json() == {"pending": True, "email": "mecburi1@example.com"}
+    assert len(sent) == 1 and "/?verify=" in sent[0][2]
+
+    # səhv parolla 401 (təsdiq vəziyyəti sızmır), düzgün parolla 403 + kod
+    assert client.post("/api/auth/login", json={"username": "mecburi1", "password": "yanlis-parol"}).status_code == 401
+    blocked = client.post("/api/auth/login", json={"username": "mecburi1", "password": "parol12345"})
+    assert blocked.status_code == 403 and blocked.json()["code"] == "email_unverified"
+
+    # yenidən göndərmə: səhv parol 401, düzgün parol + gözləmə müddəti 429, sonra 200
+    assert client.post("/api/auth/resend-verification", json={"username": "mecburi1", "password": "yanlis"}).status_code == 401
+    assert client.post("/api/auth/resend-verification", json={"username": "mecburi1", "password": "parol12345"}).status_code == 429
+    main._VERIFY_SENT.clear()
+    assert client.post("/api/auth/resend-verification", json={"username": "mecburi1", "password": "parol12345"}).json() == {"ok": True, "verified": False}
+    assert len(sent) == 2
+
+    # linkə basandan sonra giriş açılır
+    assert client.post("/api/auth/verify", json={"token": _verify_token_of(sent[-1])}).json() == {"ok": True}
+    ok = client.post("/api/auth/login", json={"username": "mecburi1", "password": "parol12345"})
+    assert ok.status_code == 200 and ok.json()["user"]["verified"] is True
+    assert client.get("/api/auth/me", headers=_auth(ok.json()["token"])).status_code == 200
+
+
+def test_unverified_existing_token_is_rejected_when_required(monkeypatch):
+    _mail_on(monkeypatch)
+    reg = _register("kohnenisan1", email="kohnenisan1@example.com").json()   # enforcement söndürülüb: nişan verilir
+    assert client.get("/api/auth/me", headers=_auth(reg["token"])).status_code == 200
+    monkeypatch.setattr(main, "REQUIRE_VERIFIED", True)
+    assert client.get("/api/auth/me", headers=_auth(reg["token"])).status_code == 401
+    assert client.post("/api/ocr", headers=_auth(reg["token"]), files=[("files", ("a.txt", b"salam", "text/plain"))]).status_code == 401
+
+
+def test_verification_not_required_without_mail_service_or_email(monkeypatch):
+    monkeypatch.setattr(main, "APP_PASSWORD", "sirr")
+    monkeypatch.setattr(main, "BREVO_API_KEY", "")
+    monkeypatch.setattr(main, "SMTP_HOST", "")
+    monkeypatch.setattr(main, "MAIL_CONSOLE", False)
+    monkeypatch.setattr(main, "REQUIRE_VERIFIED", True)
+    r = _register("mailsiz1", email="mailsiz1@example.com")
+    assert r.status_code == 200 and "token" in r.json()     # məktub xidməti yoxdur: gözləmək mənasızdır
+    assert client.get("/api/config").json()["verify_required"] is False
+    # məktub xidməti var, amma e-poçtu olmayan köhnə hesab bloklanmır
+    monkeypatch.setattr(main, "MAIL_CONSOLE", True)
+    main.db.create_user("kohnehesab1", "kohnehesab1", main.hash_password("parol12345"), "")
+    assert client.post("/api/auth/login", json={"username": "kohnehesab1", "password": "parol12345"}).status_code == 200
+    assert client.get("/api/config").json()["verify_required"] is True
+
+
+def test_reset_link_verifies_and_logs_in_when_required(monkeypatch):
+    sent = _mail_on(monkeypatch)
+    monkeypatch.setattr(main, "REQUIRE_VERIFIED", True)
+    _register("bərpa-tesdiq1".replace("ə", "e"), email="berpatesdiq1@example.com")
+    sent.clear()
+    client.post("/api/auth/forgot", json={"login": "berpa-tesdiq1"})
+    r = client.post("/api/auth/reset", json={"token": _token_of(sent[0]), "password": "yeni-parol-123"})
+    assert r.status_code == 200 and "token" in r.json()   # e-poçt qutusuna çıxışı sübut etdi: təsdiqlənir
+    assert client.post("/api/auth/login", json={"username": "berpa-tesdiq1", "password": "yeni-parol-123"}).status_code == 200

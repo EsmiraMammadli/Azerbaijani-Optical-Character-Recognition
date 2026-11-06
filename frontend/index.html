@@ -136,6 +136,7 @@
       <button type="button" class="mt-3 text-xs text-muted underline hover:text-ink" x-show="auth.mode === 'login' && cfg.mail" @click="setAuthMode('forgot')">Parolu unutmusunuz?</button>
       <p class="mt-2 min-h-[1.25rem] text-xs text-err" x-text="auth.err"></p>
       <p class="mt-1 text-xs text-ok" x-show="auth.info" x-text="auth.info"></p>
+      <button type="button" class="mt-2 text-xs text-muted underline hover:text-ink" x-show="auth.needVerify" :disabled="auth.busy" @click="resendGate()">Təsdiq linkini yenidən göndər</button>
       <button type="submit" class="btn btn-solid mt-2 w-full justify-center" :disabled="auth.busy"><iconify-icon :icon="auth.mode === 'forgot' ? 'lucide:mail' : 'lucide:key-round'"></iconify-icon><span x-text="auth.busy ? 'Gözləyin...' : authSubmitLabel()"></span></button>
     </form>
   </div>
@@ -957,7 +958,7 @@
       HMAX, QUOTA, ST,
       page: "workspace", navOpen: false, online: null,
       cfg: { auth_required: false, mail: false, max_files: 20, max_mb: 10, opencv: false, docx_pdf: false },
-      token: "", me: null, auth: { mode: "login", user: "", email: "", pass: "", invite: "", show: false, busy: false, err: "", info: "", resetToken: "" },
+      token: "", me: null, auth: { mode: "login", user: "", email: "", pass: "", invite: "", show: false, busy: false, err: "", info: "", resetToken: "", needVerify: false },
       acct: { cur: "", next: "", err: "", busy: false, mailBusy: false, delOpen: false, delPass: "", delErr: "", delBusy: false },
       authed: false, boot: false, lastSync: 0, syncing: false,
       collapsed: false,
@@ -995,6 +996,7 @@
           this.online = true;
           this.cfg.auth_required = !!c.auth_required;
           this.cfg.mail = !!c.mail;
+          this.cfg.verify_required = !!c.verify_required;
           this.cfg.opencv = !!c.opencv;
           this.cfg.docx_pdf = !!c.docx_pdf;
           if (c.max_files) this.cfg.max_files = c.max_files;
@@ -1100,7 +1102,7 @@
       },
       setAuthMode(mode) {
         const a = this.auth;
-        a.mode = mode; a.err = ""; a.info = ""; a.pass = ""; a.show = false;
+        a.mode = mode; a.err = ""; a.info = ""; a.pass = ""; a.show = false; a.needVerify = false;
       },
       authUserLabel() {
         const m = this.auth.mode;
@@ -1108,7 +1110,7 @@
       },
       authHint() {
         const m = this.auth.mode;
-        if (m === "register") return "Yeni hesab açmaq üçün sizə verilən qeydiyyat kodu lazımdır. E-poçt parolu bərpa etmək üçündür.";
+        if (m === "register") return this.cfg.verify_required ? "Yeni hesab açmaq üçün sizə verilən qeydiyyat kodu lazımdır. Hesab açandan sonra e-poçtunuza təsdiq linki gələcək, linkə basmadan daxil ola bilməzsiniz." : "Yeni hesab açmaq üçün sizə verilən qeydiyyat kodu lazımdır. E-poçt parolu bərpa etmək üçündür.";
         if (m === "forgot") return "Hesabınızın e-poçtunu və ya istifadəçi adını yazın, parol sıfırlama linki göndərəcəyik.";
         if (m === "reset") return "Hesabınız üçün yeni parol seçin.";
         return "İstifadəçi adınız (və ya e-poçtunuz) və parolunuzla daxil olun.";
@@ -1131,7 +1133,7 @@
           if (a.mode === "register" && !a.email.trim()) { a.err = "E-poçt ünvanını yazın."; return; }
           if (a.mode === "register" && !a.invite.trim()) { a.err = "Qeydiyyat kodunu yazın."; return; }
         }
-        a.busy = true; a.err = "";
+        a.busy = true; a.err = ""; a.needVerify = false;
         try {
           let path, body;
           if (a.mode === "forgot") { path = "forgot"; body = { login: username }; }
@@ -1141,17 +1143,44 @@
           const res = await fetch("/api/auth/" + path, {
             method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
           });
-          if (!res.ok) { a.err = await this.errorOf(res); return; }
+          if (!res.ok) {
+            if (res.status === 403 && a.mode === "login") {
+              const j = await res.clone().json().catch(() => ({}));
+              if (j.code === "email_unverified") a.needVerify = true;
+            }
+            a.err = await this.errorOf(res); return;
+          }
           if (a.mode === "forgot") {
             a.info = "Bu hesab üçün e-poçt varsa, parol sıfırlama linki göndərildi. Spam qovluğuna da baxın.";
             return;
           }
           const data = await res.json();
+          if (data.pending) {   // hesab açıldı, amma e-poçt təsdiqlənənə qədər daxil olmaq olmur
+            a.mode = "login"; a.needVerify = true; a.invite = ""; a.email = "";
+            a.info = "Təsdiq linki " + data.email + " ünvanına göndərildi. Linkə basın, sonra \"Daxil ol\" düyməsinə basın. Məktub gəlməsə, Spam qovluğuna baxın.";
+            return;
+          }
           this.token = data.token;
           try { localStorage.setItem("az_token", data.token); } catch {}
           a.pass = ""; a.invite = ""; a.resetToken = "";
           if (a.mode === "reset") a.mode = "login";
           await this.startSession(data.user);
+        } catch { a.err = "Serverə qoşulmaq olmadı."; }
+        finally { a.busy = false; }
+      },
+      async resendGate() {   // hələ daxil ola bilməyən istifadəçi üçün təsdiq linkini yenidən göndər
+        const a = this.auth;
+        if (a.busy) return;
+        const username = a.user.trim();
+        if (!username || !a.pass) { a.err = "İstifadəçi adı və parolu yazın, sonra yenidən basın."; return; }
+        a.busy = true; a.err = "";
+        try {
+          const res = await fetch("/api/auth/resend-verification", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username, password: a.pass }),
+          });
+          if (!res.ok) { a.err = await this.errorOf(res); return; }
+          if ((await res.json()).verified) { a.needVerify = false; a.info = "E-poçt artıq təsdiqlənib, daxil ola bilərsiniz."; }
+          else a.info = "Təsdiq linki göndərildi. Spam qovluğuna da baxın.";
         } catch { a.err = "Serverə qoşulmaq olmadı."; }
         finally { a.busy = false; }
       },
@@ -1181,7 +1210,9 @@
         try {
           const res = await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
           if (!res.ok) { const m = await this.errorOf(res); this.auth.err = m; this.toast(m, "err"); return; }
-          this.auth.info = "E-poçt təsdiqləndi.";
+          this.auth.err = ""; this.auth.needVerify = false;
+          if (!this.authed) this.auth.mode = "login";
+          this.auth.info = this.authed ? "E-poçt təsdiqləndi." : "E-poçt təsdiqləndi. İndi daxil ola bilərsiniz.";
           this.toast("E-poçt təsdiqləndi.", "ok");
           if (this.me) this.me.verified = true;
         } catch { this.toast("Serverə qoşulmaq olmadı.", "err"); }

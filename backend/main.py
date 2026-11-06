@@ -27,7 +27,7 @@ import pymupdf as fitz  # PyMuPDF
 from dotenv import load_dotenv
 from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -98,6 +98,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 MAIL_CONSOLE = os.getenv("MAIL_CONSOLE", "") == "1"             # yalnız lokal test: məktub göndərilmir, terminala yazılır
 RESET_TTL = int(os.getenv("RESET_MINUTES", "60")) * 60          # bərpa linki nə qədər etibarlıdır
 VERIFY_TTL = int(os.getenv("VERIFY_HOURS", "24")) * 3600        # e-poçt təsdiqi linki nə qədər etibarlıdır
+REQUIRE_VERIFIED = os.getenv("REQUIRE_EMAIL_VERIFICATION", "1") != "0"   # məktub xidməti varsa: təsdiqsiz hesab daxil ola bilməz
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()                # boşdursa Sentry söndürülüb
 APP_URL = os.getenv("APP_URL", "").strip().rstrip("/")          # bərpa linkinin ünvanı (Render-də avtomatik tapılır)
 HISTORY_MAX = int(os.getenv("HISTORY_MAX", "100"))        # hər istifadəçi üçün serverdə ən çox neçə tarixçə qeydi
@@ -247,6 +248,8 @@ def read_token(token: str):
         user = db.get_user(int(data["u"]))
         if not user or _pw_tag(user["pw_hash"]) != data["v"]:
             return None
+        if needs_verification(user):
+            return None
         return {"id": user["id"], "username": user["display"], "email": user.get("email"),
                 "verified": bool(user.get("email_verified"))}
     except Exception:
@@ -312,6 +315,16 @@ def mail_mode():
     if MAIL_CONSOLE:
         return "console"
     return None
+
+
+def verification_required() -> bool:
+    """Məktub xidməti işləyirsə, e-poçtu təsdiqlənməmiş hesab daxil ola bilməz."""
+    return REQUIRE_VERIFIED and mail_mode() is not None
+
+
+def needs_verification(user: dict) -> bool:
+    """E-poçtu olan, amma hələ təsdiqləməyən hesab. E-poçtsuz (köhnə) hesablara tətbiq olunmur."""
+    return verification_required() and bool(user.get("email")) and not user.get("email_verified")
 
 
 def send_mail(to: str, subject: str, text: str, html: str) -> None:
@@ -1414,7 +1427,8 @@ def verify():
 def config():
     return {"auth_required": bool(APP_PASSWORD), "accounts": bool(APP_PASSWORD), "max_files": MAX_FILES,
             "max_mb": MAX_SIZE_MB, "opencv": cv2 is not None, "docx_pdf": find_soffice() is not None,
-            "mail": bool(APP_PASSWORD) and mail_mode() is not None}
+            "mail": bool(APP_PASSWORD) and mail_mode() is not None,
+            "verify_required": bool(APP_PASSWORD) and verification_required()}
 
 
 def _public_user(row: dict) -> dict:
@@ -1448,6 +1462,8 @@ def register(request: Request, body: RegisterIn, background: BackgroundTasks):
     if mail_mode() is not None:   # təsdiq linki göndərilir; qeydiyyat bunu gözləmir
         _VERIFY_SENT[uid] = time.time()
         background.add_task(_send_verify_mail, row, f"{_base_url(request)}/?verify={make_verify_token(row)}")
+    if needs_verification(row):   # təsdiqdən əvvəl nişan verilmir: istifadəçi linkə basıb sonra daxil olur
+        return {"pending": True, "email": email}
     return {"token": make_token(row), "user": _public_user(row)}
 
 
@@ -1460,6 +1476,10 @@ def login(request: Request, body: LoginIn):
     ok = check_password(body.password, row["pw_hash"] if row else _DUMMY_HASH)
     if not row or not ok:
         raise HTTPException(401, "İstifadəçi adı və ya parol səhvdir.")
+    if needs_verification(row):   # parol düzgün olandan sonra deyilir: hesabın olub-olmaması sızmasın
+        return JSONResponse(status_code=403, content={
+            "detail": "E-poçtunuz hələ təsdiqlənməyib. Məktubdakı linkə basın (Spam qovluğuna da baxın).",
+            "code": "email_unverified"})
     return {"token": make_token(row), "user": _public_user(row)}
 
 
@@ -1521,11 +1541,33 @@ def verify_email(request: Request, body: VerifyIn):
     return {"ok": True}
 
 
+class ResendIn(BaseModel):
+    username: str = ""
+    password: str = ""
+
+
 @app.post("/api/auth/resend-verification")
 @limiter.limit(AUTH_RATE_LIMIT)
-def resend_verification(request: Request, background: BackgroundTasks, user: dict = Depends(account_user)):
-    row = db.get_user(user["id"])
-    if not row or not row.get("email"):
+def resend_verification(request: Request, background: BackgroundTasks, body: Optional[ResendIn] = None):
+    """Təsdiq linkini yenidən göndərir. Nişanla (daxil olmuş) və ya istifadəçi adı + parolla (hələ daxil ola bilməyən) işləyir."""
+    if not APP_PASSWORD:
+        raise HTTPException(403, "Hesab rejimi (APP_PASSWORD) lazımdır.")
+    auth = request.headers.get("authorization", "")
+    row = None
+    if auth.lower().startswith("bearer "):
+        u = read_token(auth[7:].strip())
+        row = db.get_user(u["id"]) if u else None
+        if not row:
+            raise HTTPException(401, "Daxil olmaq lazımdır.")
+    elif body and body.username and body.password:
+        cand = db.get_user_by_login(body.username)
+        ok = check_password(body.password, cand["pw_hash"] if cand else _DUMMY_HASH)
+        if not cand or not ok:
+            raise HTTPException(401, "İstifadəçi adı və ya parol səhvdir.")
+        row = cand
+    else:
+        raise HTTPException(401, "Daxil olmaq lazımdır.")
+    if not row.get("email"):
         raise HTTPException(400, "Hesabda e-poçt yoxdur.")
     if row.get("email_verified"):
         return {"ok": True, "verified": True}

@@ -62,9 +62,12 @@ def main_cli(argv):
         if email and db.get_user_by_email(email):
             print("Bu e-poçt artıq istifadə olunur.")
             return 1
-        if db.create_user(key, name, main.hash_password(ask_password()), email) is None:
+        uid = db.create_user(key, name, main.hash_password(ask_password()), email)
+        if uid is None:
             print("Bu ad artıq var.")
             return 1
+        if email:
+            db.set_email_verified(uid)   # administrator yaradıb: təsdiq linki tələb olunmur
         print("Hesab yaradıldı.")
     elif cmd == "setemail":
         email = argv[2].strip().casefold() if len(argv) > 2 else ""

@@ -157,6 +157,7 @@ Searchable PDF from DOCX needs LibreOffice (`soffice`). The Docker image install
 | `APP_URL` | no | Base URL used in email links. On Render, `RENDER_EXTERNAL_URL` is used automatically |
 | `RESET_MINUTES` | no | Password reset link lifetime, default `60` |
 | `VERIFY_HOURS` | no | Email verification link lifetime, default `24` |
+| `REQUIRE_EMAIL_VERIFICATION` | no | Default `1`: with a mail service, unverified accounts cannot log in. `0` disables it |
 | `SENTRY_DSN` | no | If set, errors are sent to Sentry (passwords, request bodies and IPs are not sent) |
 | `SENTRY_ENV` | no | Sentry environment name, default `production` |
 | `MAIL_CONSOLE` | no | `1` prints emails to the terminal instead of sending them (local testing only) |
@@ -167,7 +168,9 @@ Searchable PDF from DOCX needs LibreOffice (`soffice`). The Docker image install
 - Log in with a username or an email address. The login token is valid for 30 days.
 - "Forgot password?" emails a one-time link valid for one hour (`POST /api/auth/forgot`, `POST /api/auth/reset`). Changing the password signs out all old sessions.
 - If no mail service is configured (`BREVO_API_KEY` and `MAIL_FROM` missing), the link is hidden. Render's free plan blocks SMTP ports, so Brevo's HTTPS API is used.
-- After sign-up a verification link is emailed (`POST /api/auth/verify`, `POST /api/auth/resend-verification`). Verification is optional: unverified accounts work and show a warning. Following a password reset link also verifies the address.
+- After sign-up a verification link is emailed and **no login token is issued until the address is verified**. The user clicks the link, then logs in. Unverified users who try to log in see a message and a "resend link" button (`POST /api/auth/verify`, `POST /api/auth/resend-verification`). Following a password reset link also verifies the address.
+- This rule applies only when a mail service is configured (Brevo, SMTP or `MAIL_CONSOLE`). Without one, sign-up logs the user in immediately. Accounts without an email (old accounts) are never blocked. Set `REQUIRE_EMAIL_VERIFICATION=0` to turn the rule off.
+- Accounts created with `manage_users.py add` are marked verified.
 - On the "API and login" page you can change your password (`POST /api/auth/change-password`) and delete your account (`POST /api/auth/delete-account`, requires the password; the account, jobs and history are deleted).
 - `GET /healthz` does not touch the database; use it for uptime monitors such as UptimeRobot.
 
@@ -190,11 +193,12 @@ In account mode (`APP_PASSWORD` set), send `Authorization: Bearer <token>` with 
 | Method | Path | Description |
 |---|---|---|
 | GET | `/api/config` | Account requirement, limits, OpenCV and DOCX-to-PDF availability |
-| POST | `/api/auth/register` | Sign up: username, email, password, registration code (`invite`) |
-| POST | `/api/auth/login` | Log in with username or email, returns a token |
+| POST | `/api/auth/register` | Sign up: username, email, password, registration code (`invite`). Returns `{"pending": true}` when email verification is required, otherwise a token |
+| POST | `/api/auth/login` | Log in with username or email, returns a token. `403` with `code: "email_unverified"` if the email is not verified yet |
 | GET | `/api/auth/me` | Current user |
 | POST | `/api/auth/forgot`, `/api/auth/reset` | Password recovery |
-| POST | `/api/auth/verify`, `/api/auth/resend-verification` | Email verification |
+| POST | `/api/auth/verify` | Confirm an email with the token from the link |
+| POST | `/api/auth/resend-verification` | Resend the link; authenticate with a Bearer token or `{"username", "password"}` |
 | POST | `/api/auth/change-password` | Change password and invalidate old sessions |
 | POST | `/api/auth/delete-account` | Delete the account (requires the password) |
 | POST | `/api/ocr` | `files` (multiple); options: `fix`, `enhance`, `tables`, `merge`. Waits for the result |
@@ -273,6 +277,10 @@ docker run --rm -p 8000:8000 --env-file backend/.env az-ocr
 6. Add `BREVO_API_KEY` and `MAIL_FROM` for password reset and email verification.
 
 Without Docker: choose a Python environment, Build Command `pip install -r backend/requirements.txt`, Start Command `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`. In that case searchable PDF from DOCX will not work (no LibreOffice).
+
+### Emails landing in spam
+
+Verification and reset emails are sent through Brevo. If `MAIL_FROM` is a free address such as `@gmail.com`, Gmail and others cannot verify that Brevo is allowed to send for that domain, so the message often goes to spam. The reliable fix is to send from your own domain: add the domain in Brevo, publish the SPF, DKIM and DMARC DNS records it gives you, and set `MAIL_FROM` to an address on that domain.
 
 ## Privacy
 
