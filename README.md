@@ -162,7 +162,7 @@ Searchable PDF from DOCX needs LibreOffice (`soffice`). The Docker image install
 | `RESET_MINUTES` | no | Password reset link lifetime, default `60` |
 | `VERIFY_HOURS` | no | Email verification link lifetime, default `24` |
 | `REQUIRE_EMAIL_VERIFICATION` | no | Default `1`: with a mail service, unverified accounts cannot log in. `0` disables it |
-| `SENTRY_DSN` | no | If set, errors are sent to Sentry (passwords, request bodies and IPs are not sent) |
+| `SENTRY_DSN` | yes | If set, errors are sent to Sentry (passwords, request bodies and IPs are not sent) |
 | `SENTRY_ENV` | no | Sentry environment name, default `production` |
 | `MAIL_CONSOLE` | no | `1` prints emails to the terminal instead of sending them (local testing only) |
 
