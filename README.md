@@ -131,14 +131,14 @@ Searchable PDF from DOCX needs LibreOffice (`soffice`). The Docker image install
 |---|---|---|
 | `AZURE_DI_ENDPOINT` | yes | Azure Document Intelligence endpoint |
 | `AZURE_DI_KEY` | yes | Azure key |
-| `GEMINI_API_KEY` | no | Without it LLM correction is disabled and raw OCR is returned |
-| `LLM_MODEL` | no | Default: `gemini-3.5-flash` |
-| `LLM_FALLBACK_MODEL` | no | Backup model used when the main model fails |
-| `APP_PASSWORD` | no | Registration code. When set, account mode is enabled (sign-up, login, server-side history) |
+| `GEMINI_API_KEY` | yes | Without it LLM correction is disabled and raw OCR is returned |
+| `LLM_MODEL` | yes | Default: `gemini-3.5-flash` |
+| `LLM_FALLBACK_MODEL` | yes | Backup model used when the main model fails |
+| `APP_PASSWORD` | yes | Registration code. When set, account mode is enabled (sign-up, login, server-side history) |
 | `SESSION_SECRET` | on a server | Random string used to sign login and reset tokens |
 | `TOKEN_DAYS` | no | Login token lifetime in days, default `30` |
-| `DATABASE_URL` | no | External Postgres (e.g. Neon). Default: local SQLite file in `backend/data/` |
-| `RATE_LIMIT` | no | OCR requests per IP, default `20/minute` |
+| `DATABASE_URL` | yes | External Postgres (e.g. Neon). Default: local SQLite file in `backend/data/` |
+| `RATE_LIMIT` | yes | OCR requests per IP, default `20/minute` |
 | `AUTH_RATE_LIMIT` | no | Login and sign-up attempts per IP, default `10/minute` |
 | `ALLOWED_ORIGINS` | no | CORS origins, default `*` |
 | `MAX_FILES` | no | Files per request, default `20` |
@@ -151,8 +151,8 @@ Searchable PDF from DOCX needs LibreOffice (`soffice`). The Docker image install
 | `HISTORY_MAX` | no | History entries kept per user on the server, default `100` |
 | `PDF_FONT` | no | Path to a Unicode `.ttf` for searchable PDF |
 | `SOFFICE_PATH` | no | Path to LibreOffice (`soffice`) if not found automatically |
-| `BREVO_API_KEY` | no | Brevo API key for password reset and verification emails |
-| `MAIL_FROM` | no | Verified sender address in Brevo |
+| `BREVO_API_KEY` | yes | Brevo API key for password reset and verification emails |
+| `MAIL_FROM` | yes | Verified sender address in Brevo |
 | `MAIL_FROM_NAME` | no | Sender name, default `Azərbaycan OCR` |
 | `APP_URL` | no | Base URL used in email links. On Render, `RENDER_EXTERNAL_URL` is used automatically |
 | `RESET_MINUTES` | no | Password reset link lifetime, default `60` |
