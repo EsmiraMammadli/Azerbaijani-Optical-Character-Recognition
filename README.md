@@ -4,6 +4,10 @@ A web app that extracts text from Azerbaijani scans, photos and office documents
 
 The interface is in Azerbaijani.
 
+**Live demo:** https://azerbaijani-optical-character-recognition.onrender.com/
+
+Sign-up needs a registration code. The demo runs on Render's free plan, so the first request after a period of inactivity can take about a minute while the service wakes up. Do not upload personal documents to it.
+
 ![Workspace: file upload and options](docs/screenshots/03-workspace.png)
 
 ## Features
