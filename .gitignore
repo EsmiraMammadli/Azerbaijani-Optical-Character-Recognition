@@ -1,0 +1,44 @@
+# secrets: never commit these (keep only .env.example)
+.env
+*.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+service-account*.json
+credentials*.json
+
+# Python
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# personal documents and OCR output: do not commit
+backend/eval/samples/*
+backend/eval/ground_truth/*
+!backend/eval/samples/.gitkeep
+!backend/eval/ground_truth/.gitkeep
+backend/eval/results.md
+backend/eval/results.csv
+
+# local databases (users, history) and logs
+backend/data/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

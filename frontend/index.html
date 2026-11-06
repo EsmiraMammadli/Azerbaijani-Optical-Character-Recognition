@@ -1,0 +1,1983 @@
+<!DOCTYPE html>
+<html lang="az">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Azərbaycan OCR</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          paper: "rgb(var(--c-paper) / <alpha-value>)",
+          surface: "rgb(var(--c-surface) / <alpha-value>)",
+          raised: "rgb(var(--c-raised) / <alpha-value>)",
+          line: "rgb(var(--c-line) / <alpha-value>)",
+          ink: "rgb(var(--c-ink) / <alpha-value>)",
+          muted: "rgb(var(--c-muted) / <alpha-value>)",
+          accent: "rgb(var(--c-accent) / <alpha-value>)",
+          accentText: "rgb(var(--c-accent-t) / <alpha-value>)",
+          onaccent: "rgb(var(--c-onaccent) / <alpha-value>)",
+          ok: "rgb(var(--c-ok) / <alpha-value>)",
+          warn: "rgb(var(--c-warn) / <alpha-value>)",
+          err: "rgb(var(--c-err) / <alpha-value>)",
+        },
+        fontFamily: {
+          display: ["Space Grotesk", "system-ui", "sans-serif"],
+          body: ["Inter", "system-ui", "sans-serif"],
+          mono: ["IBM Plex Mono", "ui-monospace", "Menlo", "Consolas", "monospace"],
+        },
+      } },
+    };
+  </script>
+  <script src="https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+  <style>
+    :root {
+      --c-paper: 250 250 248; --c-surface: 255 255 255; --c-raised: 240 240 236; --c-line: 217 217 210;
+      --c-ink: 17 17 16; --c-muted: 107 107 100; --c-accent: 255 77 0; --c-accent-t: 200 56 0; --c-onaccent: 255 255 255;
+      --c-ok: 21 128 61; --c-warn: 180 83 9; --c-err: 185 28 28;
+      --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+      color-scheme: light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --c-paper: 18 18 17; --c-surface: 26 26 24; --c-raised: 36 36 33; --c-line: 52 52 47;
+        --c-ink: 242 242 238; --c-muted: 154 154 146; --c-accent: 255 106 43; --c-accent-t: 255 128 72; --c-onaccent: 17 17 16;
+        --c-ok: 74 222 128; --c-warn: 251 191 36; --c-err: 248 113 113;
+        color-scheme: dark;
+      }
+    }
+    [x-cloak] { display: none !important; }
+    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+    body { margin: 0; background: rgb(var(--c-paper)); color: rgb(var(--c-ink)); font: 14px/1.5 Inter, system-ui, sans-serif; }
+    ::selection { background: rgb(var(--c-accent) / .25); }
+    button, input, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    :focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
+    iconify-icon { display: inline-block; vertical-align: middle; }
+
+    .lbl { font: 500 11px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-muted)); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 12px; border: 1px solid rgb(var(--c-line)); background: rgb(var(--c-surface)); color: rgb(var(--c-ink)); font: 500 11px/1.2 var(--mono); letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; transition: background-color .15s, color .15s, border-color .15s; }
+    .btn:hover:not(:disabled) { border-color: rgb(var(--c-ink)); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-solid { background: rgb(var(--c-ink)); border-color: rgb(var(--c-ink)); color: rgb(var(--c-paper)); }
+    .btn-solid:hover:not(:disabled), .btn-ink:hover:not(:disabled) { background: rgb(var(--c-accent)); border-color: rgb(var(--c-accent)); color: rgb(var(--c-onaccent)); }
+    .btn-accent { background: rgb(var(--c-accent)); border-color: rgb(var(--c-accent)); color: rgb(var(--c-onaccent)); }
+    .btn-accent:hover:not(:disabled) { background: rgb(var(--c-ink)); border-color: rgb(var(--c-ink)); color: rgb(var(--c-paper)); }
+    .btn-ink:hover:not(:disabled) { background: rgb(var(--c-ink)); border-color: rgb(var(--c-ink)); color: rgb(var(--c-paper)); }
+    .btn-sm { padding: 5px 8px; font-size: 10px; }
+    .btn-ico { padding: 0; width: 32px; height: 32px; }
+    .chip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid rgb(var(--c-line)); background: rgb(var(--c-paper)); padding: 2px 7px; font: 400 10px/1.5 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-muted)); }
+    .fchip { border: 1px solid rgb(var(--c-line)); padding: 4px 10px; font: 500 10px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-muted)); background: transparent; transition: all .15s; }
+    .fchip:hover { border-color: rgb(var(--c-ink)); color: rgb(var(--c-ink)); }
+    .fchip[aria-pressed="true"] { background: rgb(var(--c-ink)); border-color: rgb(var(--c-ink)); color: rgb(var(--c-paper)); }
+    .sec-n { font: 400 12px var(--mono); color: rgb(var(--c-muted)); }
+    .box { border: 1px solid rgb(var(--c-line)); background: rgb(var(--c-surface)); }
+    .sw { position: relative; flex: none; width: 36px; height: 20px; border-radius: 999px; border: 1px solid rgb(var(--c-line)); background: rgb(var(--c-raised)); transition: background-color .15s, border-color .15s; }
+    .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: rgb(var(--c-muted)); transition: transform .15s, background-color .15s; }
+    .sw[aria-checked="true"] { background: rgb(var(--c-accent)); border-color: rgb(var(--c-accent)); }
+    .sw[aria-checked="true"]::after { transform: translateX(16px); background: #fff; }
+    .sw:disabled { opacity: .45; cursor: not-allowed; }
+    .field { width: 100%; border: 1px solid rgb(var(--c-line)); background: rgb(var(--c-paper)); padding: 8px 10px; font-size: 13px; outline: none; }
+    .field:focus { border-color: rgb(var(--c-ink)); }
+    .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .tbl th { text-align: left; padding: 10px 16px; font: 500 10px/1.3 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-muted)); border-bottom: 1px solid rgb(var(--c-line)); white-space: nowrap; }
+    .tbl td { padding: 11px 16px; border-bottom: 1px solid rgb(var(--c-line)); vertical-align: middle; }
+    .tbl tbody tr:last-child td { border-bottom: 0; }
+    .tbl tbody tr.row-link { cursor: pointer; }
+    .tbl tbody tr.row-link:hover { background: rgb(var(--c-raised) / .6); }
+    .gridtbl { border-collapse: collapse; font-size: 13px; }
+    .gridtbl td { border: 1px solid rgb(var(--c-line)); padding: 5px 10px; vertical-align: top; }
+    .gridtbl tr:first-child td { background: rgb(var(--c-raised)); font-weight: 500; }
+    .editor { display: block; width: 100%; min-height: 460px; padding: 16px; border: 0; background: rgb(var(--c-surface)); resize: vertical; outline: none; font: 14px/1.65 Inter, system-ui, sans-serif; }
+    .cmp { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 14px/1.65 Inter, system-ui, sans-serif; max-height: 560px; overflow: auto; }
+    .cmp mark { color: inherit; padding: 0 1px; }
+    .cmp mark.del { background: rgb(var(--c-err) / .2); }
+    .cmp mark.add { background: rgb(var(--c-ok) / .22); }
+    .code { font: 12px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; background: rgb(var(--c-paper)); border: 1px solid rgb(var(--c-line)); padding: 12px; margin: 0; }
+    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(300%); } }
+    .indet { animation: slide 1.1s linear infinite; }
+    @media (prefers-reduced-motion: reduce) { .indet { animation: none; width: 100%; } .animate-spin { animation: none !important; } }
+  </style>
+</head>
+<body x-data="app()" x-cloak
+      @dragenter.window="dragIn($event)" @dragleave.window="dragOut($event)" @dragover.window.prevent @drop.window.prevent="dropFiles($event)"
+      @paste.window="onPaste($event)" @keydown.escape.window="navOpen = false; if (cam.open) closeCam()">
+
+  <!-- ============ Giriş / qeydiyyat pəncərəsi ============ -->
+  <div x-show="gate" x-cloak x-transition.opacity class="fixed inset-0 z-[100] grid place-items-center overflow-y-auto bg-paper/95 p-4 backdrop-blur-sm"
+       x-effect="if (gate) $nextTick(() => $refs.gateUser && $refs.gateUser.focus())" role="dialog" aria-modal="true" aria-label="Giriş">
+    <form class="w-full max-w-sm border border-line bg-surface p-6" @submit.prevent="submitAuth()">
+      <div class="flex items-center gap-2.5">
+        <div class="grid h-8 w-8 shrink-0 place-items-center bg-accent"><span class="text-xs font-bold text-onaccent">AZ</span></div>
+        <p class="font-display text-lg font-semibold tracking-tight">Azərbaycan OCR</p>
+      </div>
+      <div class="mt-5 grid grid-cols-2 gap-2" x-show="auth.mode === 'login' || auth.mode === 'register'">
+        <button type="button" class="btn justify-center" :class="auth.mode === 'login' ? 'btn-solid' : ''" @click="setAuthMode('login')">Daxil ol</button>
+        <button type="button" class="btn justify-center" :class="auth.mode === 'register' ? 'btn-solid' : ''" @click="setAuthMode('register')">Qeydiyyat</button>
+      </div>
+      <button type="button" class="btn mt-5" x-show="auth.mode === 'forgot' || auth.mode === 'reset'" @click="setAuthMode('login')"><iconify-icon icon="lucide:arrow-left"></iconify-icon>Geri</button>
+      <p class="mt-4 text-sm text-muted" x-text="authHint()"></p>
+      <div class="mt-3 space-y-2">
+        <input x-ref="gateUser" x-show="auth.mode !== 'reset'" type="text" x-model="auth.user" @input="auth.err = ''" class="field" :placeholder="authUserLabel()" autocomplete="username" autocapitalize="none" spellcheck="false" :aria-label="authUserLabel()" />
+        <input x-show="auth.mode === 'register'" type="email" x-model="auth.email" @input="auth.err = ''" class="field" placeholder="E-poçt" autocomplete="email" autocapitalize="none" spellcheck="false" aria-label="E-poçt" />
+        <div class="flex gap-2" x-show="auth.mode !== 'forgot'">
+          <input :type="auth.show ? 'text' : 'password'" x-model="auth.pass" @input="auth.err = ''" class="field" :placeholder="auth.mode === 'register' ? 'Parol (ən azı 8 simvol)' : (auth.mode === 'reset' ? 'Yeni parol (ən azı 8 simvol)' : 'Parol')" :autocomplete="auth.mode === 'register' || auth.mode === 'reset' ? 'new-password' : 'current-password'" aria-label="Parol" />
+          <button type="button" class="btn btn-ico shrink-0" @click="auth.show = !auth.show" :aria-label="auth.show ? 'Gizlət' : 'Göstər'"><iconify-icon :icon="auth.show ? 'lucide:eye-off' : 'lucide:eye'"></iconify-icon></button>
+        </div>
+        <input x-show="auth.mode === 'register'" type="password" x-model="auth.invite" @input="auth.err = ''" class="field" placeholder="Qeydiyyat kodu" autocomplete="off" aria-label="Qeydiyyat kodu" />
+      </div>
+      <button type="button" class="mt-3 text-xs text-muted underline hover:text-ink" x-show="auth.mode === 'login' && cfg.mail" @click="setAuthMode('forgot')">Parolu unutmusunuz?</button>
+      <p class="mt-2 min-h-[1.25rem] text-xs text-err" x-text="auth.err"></p>
+      <p class="mt-1 text-xs text-ok" x-show="auth.info" x-text="auth.info"></p>
+      <button type="submit" class="btn btn-solid mt-2 w-full justify-center" :disabled="auth.busy"><iconify-icon :icon="auth.mode === 'forgot' ? 'lucide:mail' : 'lucide:key-round'"></iconify-icon><span x-text="auth.busy ? 'Gözləyin...' : authSubmitLabel()"></span></button>
+    </form>
+  </div>
+
+  <!-- ============ Sidebar ============ -->
+  <div x-show="navOpen" x-transition.opacity @click="navOpen = false" class="fixed inset-0 z-30 bg-ink/50 lg:hidden"></div>
+  <aside class="fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-line bg-surface transition-transform duration-200"
+         :class="[navOpen ? 'translate-x-0' : '-translate-x-full', collapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0']" aria-label="Əsas naviqasiya">
+    <div class="flex items-center gap-2.5 border-b border-line px-5 py-5">
+      <div class="grid h-8 w-8 shrink-0 place-items-center bg-accent"><span class="text-xs font-bold text-onaccent">AZ</span></div>
+      <div class="min-w-0">
+        <p class="truncate font-display text-lg font-semibold leading-none tracking-tight">Azərbaycan OCR</p>
+      </div>
+      <button type="button" class="btn btn-ico ml-auto shrink-0" @click="closeNav()" aria-label="Menyunu bağla" title="Menyunu bağla"><iconify-icon icon="lucide:panel-left-close"></iconify-icon></button>
+    </div>
+    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <template x-for="n in nav" :key="n.id">
+        <a :href="'#/' + n.id" class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors"
+           :class="page === n.id ? 'bg-accent/10 text-accentText' : 'text-muted hover:bg-raised hover:text-ink'"
+           :aria-current="page === n.id ? 'page' : null">
+          <iconify-icon :icon="'lucide:' + n.icon" class="text-lg"></iconify-icon>
+          <span x-text="n.label"></span>
+          <span x-show="n.count() > 0" class="ml-auto border border-line bg-paper px-1.5 font-mono text-[10px] tabular-nums text-muted" x-text="n.count()"></span>
+        </a>
+      </template>
+    </nav>
+    <div class="border-t border-line px-5 py-4">
+      <div class="flex items-center gap-2">
+        <span class="h-1.5 w-1.5" :class="online === null ? 'bg-muted' : online ? 'bg-ok' : 'bg-err'"></span>
+        <span class="lbl" x-text="online === null ? 'Yoxlanılır...' : online ? 'Server onlayn' : 'Server əlçatmazdır'"></span>
+      </div>
+      <p class="mt-2 text-xs text-muted" x-text="`${cfg.max_files} fayl · hər biri ${cfg.max_mb} MB-a qədər`"></p>
+    </div>
+  </aside>
+
+  <div class="transition-[padding] duration-200" :class="collapsed ? '' : 'lg:pl-60'">
+    <!-- ============ Topbar ============ -->
+    <header class="sticky top-0 z-20 border-b border-line bg-paper/95 backdrop-blur-sm">
+      <div class="mx-auto flex h-14 max-w-[1400px] items-center gap-3 px-4 sm:px-8">
+        <div :class="collapsed ? '' : 'lg:hidden'"><button type="button" class="btn btn-ico" @click="toggleNav()" aria-label="Menyunu aç" title="Menyunu aç"><iconify-icon :icon="collapsed ? 'lucide:panel-left-open' : 'lucide:panel-left'" class="text-base"></iconify-icon></button></div>
+        <span class="font-display text-base font-semibold" :class="collapsed ? '' : 'lg:hidden'">Azərbaycan OCR</span>
+        <span class="lbl hidden" :class="collapsed ? '' : 'lg:block'">Sənəd emal xətti</span>
+
+        <div class="ml-auto flex items-center gap-2">
+          <!-- İstifadəçi və çıxış (yalnız daxil olunubsa görünür) -->
+          <span class="hidden items-center gap-1.5 text-xs text-muted sm:inline-flex" x-show="cfg.auth_required && authed && me"><iconify-icon icon="lucide:user-round"></iconify-icon><span x-text="me && me.username"></span></span>
+          <button type="button" class="btn" x-show="cfg.auth_required && authed" @click="logout()" title="Çıxış">
+            <iconify-icon icon="lucide:log-out"></iconify-icon><span class="hidden sm:inline">Çıxış</span>
+          </button>
+          <button type="button" class="btn btn-accent" @click="go('workspace')" x-show="page !== 'workspace'"><iconify-icon icon="lucide:plus"></iconify-icon><span class="hidden sm:inline">Yeni sənəd</span></button>
+        </div>
+      </div>
+    </header>
+    <div class="border-b border-line bg-raised">
+      <div class="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2 text-xs text-muted sm:px-8">
+        <span class="lbl text-ink">Demo</span>
+        <span>Şəxsi sənəd yükləməyin. Fayllar Azure Document Intelligence-ə, “LLM ilə düzəlt” seçilibsə Gemini-yə də göndərilir.</span>
+      </div>
+    </div>
+
+    <div class="border-b border-line bg-warn/10" x-show="cfg.auth_required && cfg.mail && authed && me && me.email && !me.verified" x-cloak>
+      <div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-3 px-4 py-2 text-xs sm:px-8">
+        <span>E-poçtunuzu təsdiqləyin: <b x-text="me && me.email"></b>. Parol bərpası linki bu ünvana gedir.</span>
+        <button type="button" class="btn" :disabled="acct.mailBusy" @click="resendVerify()"><iconify-icon icon="lucide:mail-check"></iconify-icon>Təsdiq linki göndər</button>
+      </div>
+    </div>
+
+    <main>
+      <!-- ====================================================================== -->
+      <!-- ============================ İŞ SAHƏSİ =============================== -->
+      <!-- ====================================================================== -->
+      <div x-show="page === 'workspace'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="border-b border-line">
+          <div class="mx-auto flex max-w-[1400px] flex-wrap items-end justify-between gap-4 px-4 py-6 sm:px-8">
+            <div class="min-w-0">
+              <div class="lbl flex items-center gap-2"><span>İş sahəsi</span><span class="text-line">/</span><span class="text-ink">Yüklə və oxu</span></div>
+              <h1 class="mt-2 font-display text-xl font-semibold tracking-tight">Azərbaycan dilində sənədlərdən mətn çıxar</h1>
+              <p class="mt-1 text-sm text-muted">Skan, şəkil və ofis sənədləri. ə, ı, ö, ü, ç, ş, ğ hərfləri düzgün oxunur.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="mx-auto max-w-[1400px] space-y-8 px-4 py-8 sm:px-8">
+          <!-- 01 Yüklə -->
+          <section>
+            <div class="mb-3 flex items-center gap-3">
+              <span class="sec-n">01</span><h2 class="font-display text-sm font-medium">Yüklə</h2>
+              <span class="lbl ml-auto hidden sm:block" x-text="`Ən çox ${cfg.max_files} fayl · hər fayl ${cfg.max_mb} MB`"></span>
+            </div>
+            <div class="box cursor-pointer p-6 transition-colors hover:border-accent sm:p-8" :class="dragDepth > 0 && 'border-accent bg-accent/5'"
+                 tabindex="0" role="button" aria-label="Fayl seç" @click="if (!$event.target.closest('button')) $refs.file.click()"
+                 @keydown.enter.self.prevent="$refs.file.click()" @keydown.space.self.prevent="$refs.file.click()">
+              <div class="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-start gap-5">
+                  <div class="grid h-12 w-12 shrink-0 place-items-center border border-line"><iconify-icon icon="lucide:upload-cloud" class="text-xl"></iconify-icon></div>
+                  <div>
+                    <h3 class="font-display text-xl font-medium leading-tight">Skan və ya qarışıq formatlı sənədləri bura buraxın</h3>
+                    <p class="mt-1.5 max-w-xl text-sm leading-relaxed text-muted">Bir və ya bir neçə fayl seçə bilərsiniz. Ctrl+V ilə panodakı şəkli də əlavə etmək olar.</p>
+                    <div class="mt-4 flex flex-wrap gap-1.5">
+                      <template x-for="t in ['PDF','JPG','PNG','HEIC','DOCX','PPTX','XLSX','TXT','CSV','HTML']"><span class="chip" x-text="t"></span></template>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex shrink-0 flex-wrap gap-2">
+                  <button type="button" class="btn btn-solid px-5 py-3" @click="$refs.file.click()"><iconify-icon icon="lucide:folder-open"></iconify-icon>Fayl seç</button>
+                  <button type="button" class="btn px-5 py-3" @click="openCam()" :disabled="running"><iconify-icon icon="lucide:camera"></iconify-icon>Kamera ilə skan et</button>
+                </div>
+              </div>
+            </div>
+            <input type="file" x-ref="file" multiple hidden @change="addFiles([...$el.files]); $el.value = ''"
+                   accept=".pdf,.docx,.pptx,.xlsx,.txt,.md,.csv,.html,.htm,.jpg,.jpeg,.png,.bmp,.tif,.tiff,.webp,.gif,.heic,.heif,image/*" />
+            <input type="file" x-ref="camInput" accept="image/*" capture="environment" hidden @change="onCamInput($el)" />
+          </section>
+
+          <!-- 02 Parametrlər -->
+          <section>
+            <div class="mb-3 flex items-center gap-3"><span class="sec-n">02</span><h2 class="font-display text-sm font-medium">Parametrlər</h2></div>
+            <div class="grid gap-px border border-line bg-line sm:grid-cols-2 lg:grid-cols-4">
+              <template x-for="t in toggles" :key="t.key">
+                <div class="bg-surface px-5 py-4">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="flex items-center gap-2">
+                      <span class="grid h-8 w-8 place-items-center border border-line"><iconify-icon :icon="'lucide:' + t.icon"></iconify-icon></span>
+                      <span class="lbl text-ink" x-text="t.title"></span>
+                    </div>
+                    <button type="button" role="switch" class="sw mt-1" :aria-checked="opts[t.key]" :aria-label="t.title" @click="opts[t.key] = !opts[t.key]"></button>
+                  </div>
+                  <p class="mt-3 text-xs leading-relaxed text-muted" x-text="t.desc"></p>
+                  <span class="mt-2 inline-block font-mono text-[11px] uppercase tracking-wider" :class="opts[t.key] ? 'text-accentText' : 'text-muted'" x-text="opts[t.key] ? 'Aktiv' : 'Passiv'"></span>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <!-- 03 Əməliyyatlar -->
+          <section>
+            <div class="mb-3 flex items-center gap-3"><span class="sec-n">03</span><h2 class="font-display text-sm font-medium">Əməliyyatlar</h2></div>
+            <div class="box grid grid-cols-1 divide-y divide-line sm:grid-cols-2 sm:divide-x lg:grid-cols-4 lg:divide-y-0">
+              <button type="button" class="group flex flex-col items-start gap-3 p-5 text-left transition-colors hover:bg-raised/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent" @click="run()" :disabled="running || !items.length">
+                <span class="grid h-10 w-10 place-items-center border border-line group-hover:border-ink/30"><iconify-icon icon="lucide:scan-text"></iconify-icon></span>
+                <span><span class="block text-sm font-medium">Mətni çıxar</span><span class="mt-1 block text-xs leading-relaxed text-muted">Mətn qatını oxuyur və ya skan səhifələrdə OCR işlədir.</span></span>
+                <span class="mt-auto lbl" x-text="targetInfo"></span>
+              </button>
+              <button type="button" class="group flex flex-col items-start gap-3 p-5 text-left transition-colors hover:bg-raised/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent" @click="dlPdf()" :disabled="running || !usable">
+                <span class="grid h-10 w-10 place-items-center border border-line group-hover:border-ink/30"><iconify-icon icon="lucide:file-search"></iconify-icon></span>
+                <span><span class="block text-sm font-medium">Axtarışlı PDF</span><span class="mt-1 block text-xs leading-relaxed text-muted">Skan və şəkillərin üstünə görünməz mətn qatı əlavə edir, DOCX-i axtarışlı PDF-ə çevirir. Mətn seçilə və axtarıla bilir.</span></span>
+                <span class="mt-auto lbl">PDF və şəkillər</span>
+              </button>
+              <button type="button" class="group flex flex-col items-start gap-3 p-5 text-left transition-colors hover:bg-raised/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent" @click="exportDocx()" :disabled="!okResult">
+                <span class="grid h-10 w-10 place-items-center border border-line group-hover:border-ink/30"><iconify-icon icon="lucide:file-text"></iconify-icon></span>
+                <span><span class="block text-sm font-medium">Word-ə yüklə</span><span class="mt-1 block text-xs leading-relaxed text-muted">Cari nəticəni redaktə oluna bilən .docx faylına çevirir.</span></span>
+                <span class="mt-auto lbl" x-text="okResult ? 'DOCX' : 'Əvvəlcə mətni çıxarın'"></span>
+              </button>
+              <button type="button" class="group flex flex-col items-start gap-3 p-5 text-left transition-colors hover:bg-raised/60 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent" @click="exportXlsx(tables)" :disabled="!tables.length">
+                <span class="grid h-10 w-10 place-items-center border border-line group-hover:border-ink/30"><iconify-icon icon="lucide:table-2"></iconify-icon></span>
+                <span><span class="block text-sm font-medium">Excel-ə yüklə</span><span class="mt-1 block text-xs leading-relaxed text-muted">Aşkarlanan cədvəlləri .xlsx faylına köçürür, hər cədvəl ayrı vərəqdə.</span></span>
+                <span class="mt-auto lbl" x-text="tables.length ? tables.length + ' cədvəl' : 'Cədvəl yoxdur'"></span>
+              </button>
+            </div>
+          </section>
+
+          <!-- 04 Növbə -->
+          <section>
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+              <span class="sec-n">04</span><h2 class="font-display text-sm font-medium">Növbə</h2>
+              <span class="chip" x-text="items.length + ' fayl'"></span>
+              <div class="ml-auto flex flex-wrap items-center gap-2">
+                <button type="button" class="btn" @click="mergePicked()" :disabled="!canMerge"><iconify-icon icon="lucide:git-merge"></iconify-icon>Seçilmişləri birləşdir</button>
+                <button type="button" class="btn" @click="clearItems()" :disabled="running || !items.length"><iconify-icon icon="lucide:trash-2"></iconify-icon>Hamısını sil</button>
+                <button type="button" class="btn btn-accent" @click="run()" :disabled="running || !items.length"><iconify-icon icon="lucide:scan-text"></iconify-icon><span x-text="picked.length ? 'Seçilmişləri emal et (' + picked.length + ')' : 'Mətni çıxar'"></span></button>
+              </div>
+            </div>
+
+            <!-- süzgəc -->
+            <div class="mb-3 flex flex-wrap items-center gap-2" x-show="items.length">
+              <template x-for="f in filters" :key="f[0]">
+                <button type="button" class="fchip" :aria-pressed="filter === f[0]" @click="filter = f[0]">
+                  <span x-text="f[1]"></span> <span class="opacity-60" x-text="count(f[0])"></span>
+                </button>
+              </template>
+              <div class="relative ml-auto w-full sm:w-60">
+                <iconify-icon icon="lucide:search" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"></iconify-icon>
+                <input type="search" x-model="q" class="field pl-8" placeholder="Fayl adı ilə axtar" aria-label="Növbədə axtar" />
+              </div>
+            </div>
+
+            <!-- irəliləyiş -->
+            <div x-show="running" x-transition class="box mb-3 px-5 py-3">
+              <div class="flex items-center gap-3">
+                <iconify-icon icon="lucide:loader" class="animate-spin text-accentText"></iconify-icon>
+                <span class="text-sm">Emal olunur... <span class="font-mono text-xs text-muted" x-text="(progress.total ? progress.done + ' / ' + progress.total + ' fayl · ' : '') + elapsed + ' s'"></span></span>
+                <button type="button" class="btn btn-sm ml-auto" @click="cancel()">Ləğv et</button>
+              </div>
+              <div class="mt-3 h-0.5 overflow-hidden bg-raised"><i class="block h-full bg-accent transition-all duration-500" :style="`width:${progress.total ? Math.max(6, Math.round(progress.done / progress.total * 100)) : 6}%`"></i></div>
+            </div>
+
+            <div class="box overflow-hidden">
+              <template x-if="!items.length">
+                <div class="flex flex-col items-center gap-3 px-6 py-12 text-center">
+                  <span class="grid h-12 w-12 place-items-center border border-line text-muted"><iconify-icon icon="lucide:files" class="text-xl"></iconify-icon></span>
+                  <p class="text-sm text-muted">Hələ fayl seçilməyib. Yuxarıdan fayl əlavə edin, sonra “Mətni çıxar” düyməsinə basın.</p>
+                </div>
+              </template>
+              <div class="overflow-x-auto" x-show="items.length">
+                <table class="tbl">
+                  <thead>
+                    <tr>
+                      <th class="w-10"><input type="checkbox" class="accent-[rgb(var(--c-accent))]" aria-label="Hamısını seç" :checked="allPicked" @change="pickAll($event.target.checked)" /></th>
+                      <th>Fayl</th>
+                      <th class="hidden md:table-cell">Metod</th>
+                      <th>Status</th>
+                      <th class="hidden text-right md:table-cell">Səhifə</th>
+                      <th class="hidden lg:table-cell">Etibarlılıq</th>
+                      <th class="text-right">Əməliyyat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <template x-for="it in filteredItems" :key="it.id">
+                      <tr :class="it.ri >= 0 && 'row-link'" @click="if (it.ri >= 0) openItem(it)">
+                        <td @click.stop><input type="checkbox" class="accent-[rgb(var(--c-accent))]" :aria-label="'Seç: ' + it.file.name" :checked="picked.includes(it.id)" @change="togglePick(it.id)" :disabled="running" /></td>
+                        <td>
+                          <div class="flex min-w-0 items-center gap-3">
+                            <span class="grid h-8 w-8 shrink-0 place-items-center border border-line bg-paper"><iconify-icon :icon="'lucide:' + fileIcon(it.file.name)" class="text-sm"></iconify-icon></span>
+                            <div class="min-w-0">
+                              <p class="max-w-[16rem] truncate font-medium sm:max-w-sm" x-text="it.file.name" :title="it.file.name"></p>
+                              <p class="font-mono text-[11px] text-muted"><span x-text="extOf(it.file.name).toUpperCase()"></span> · <span x-text="fmtSize(it.file.size)"></span></p>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="hidden md:table-cell"><span class="chip" x-show="it.method" x-text="methodLabel(it.method)"></span><span class="chip ml-1" x-show="it.llm">LLM</span><span x-show="!it.method" class="text-muted">—</span></td>
+                        <td>
+                          <span class="inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium" :class="ST[it.status].cls" :title="it.msg">
+                            <iconify-icon x-show="it.status === 'run'" icon="lucide:loader" class="animate-spin"></iconify-icon>
+                            <span x-show="it.status !== 'run'" class="h-1.5 w-1.5" :class="ST[it.status].dot"></span>
+                            <span x-text="ST[it.status].label"></span>
+                          </span>
+                          <p x-show="it.status === 'err' && it.msg" class="mt-1 max-w-xs text-xs text-err" x-text="it.msg"></p>
+                        </td>
+                        <td class="hidden text-right font-mono text-xs tabular-nums md:table-cell" x-text="it.pages ?? '—'"></td>
+                        <td class="hidden font-mono text-xs tabular-nums lg:table-cell" x-text="it.conf == null ? '—' : Math.round(it.conf * 100) + '%'" :title="it.method === 'document-text' || it.method === 'pdf-text-layer' ? 'Mətn birbaşa fayldan götürülüb, OCR olmayıb' : ''"></td>
+                        <td @click.stop>
+                          <div class="flex items-center justify-end gap-1.5">
+                            <button type="button" class="btn btn-sm btn-ink" x-show="it.ri >= 0" @click="openItem(it)">Aç</button>
+                            <button type="button" class="btn btn-sm btn-ico !h-7 !w-7" @click="removeItem(it.id)" :disabled="running" :aria-label="'Sil: ' + it.file.name"><span aria-hidden="true" class="text-base leading-none">×</span></button>
+                          </div>
+                        </td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+              <p x-show="items.length && !filteredItems.length" class="border-t border-line px-5 py-8 text-center text-sm text-muted">Süzgəcə uyğun fayl yoxdur.</p>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ====================================================================== -->
+      <!-- ============================== NƏTİCƏ ================================ -->
+      <!-- ====================================================================== -->
+      <div x-show="page === 'result'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+        <!-- boş vəziyyət -->
+        <template x-if="!hasR">
+          <div class="mx-auto flex max-w-xl flex-col items-center gap-4 px-6 py-24 text-center">
+            <span class="grid h-14 w-14 place-items-center border border-line text-muted"><iconify-icon icon="lucide:scan-text" class="text-2xl"></iconify-icon></span>
+            <h1 class="font-display text-xl font-semibold">Hələ nəticə yoxdur</h1>
+            <p class="text-sm text-muted">Fayl yükləyib “Mətni çıxar” düyməsinə basın, nəticə burada açılacaq. Əvvəlki nəticələr üçün Tarixçəyə baxın.</p>
+            <div class="flex gap-2"><button type="button" class="btn btn-solid" @click="go('workspace')">İş sahəsinə keç</button><button type="button" class="btn" @click="go('history')">Tarixçə</button></div>
+          </div>
+        </template>
+
+        <template x-if="hasR">
+          <div>
+            <div class="border-b border-line">
+              <div class="mx-auto flex max-w-[1400px] flex-wrap items-end justify-between gap-4 px-4 py-6 sm:px-8">
+                <div class="min-w-0">
+                  <div class="lbl flex items-center gap-2"><a href="#/workspace" class="hover:text-ink">İş sahəsi</a><span class="text-line">/</span><span class="text-ink">Nəticə</span></div>
+                  <div class="mt-2 flex flex-wrap items-center gap-3">
+                    <h1 class="min-w-0 break-words font-display text-xl font-semibold tracking-tight" x-text="r.label"></h1>
+                    <template x-if="!r.data.error">
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="chip" x-show="r.data.method" x-text="methodLabel(r.data.method)"></span>
+                        <span class="chip" x-show="r.data.llm_fixed">LLM</span>
+                        <span class="chip" x-show="r.data.pages" x-text="r.data.pages + ' səhifə'"></span>
+                        <span class="chip" x-show="confPct != null" x-text="confPct + '% etibarlılıq'"></span>
+                      </div>
+                    </template>
+                    <span class="chip !border-err/40 !text-err" x-show="r.data.error">Xəta</span>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <div class="flex items-center border border-line bg-surface" x-show="results.length > 1">
+                    <button type="button" class="grid h-8 w-8 place-items-center border-r border-line text-muted hover:bg-raised hover:text-ink" @click="step(-1)" aria-label="Əvvəlki nəticə"><span aria-hidden="true" class="text-base leading-none">‹</span></button>
+                    <span class="px-3 font-mono text-xs tabular-nums" x-text="(sel + 1) + ' / ' + results.length"></span>
+                    <button type="button" class="grid h-8 w-8 place-items-center border-l border-line text-muted hover:bg-raised hover:text-ink" @click="step(1)" aria-label="Növbəti nəticə"><span aria-hidden="true" class="text-base leading-none">›</span></button>
+                  </div>
+                  <button type="button" class="btn" @click="showSettings = !showSettings" :aria-expanded="showSettings"><iconify-icon icon="lucide:sliders-horizontal"></iconify-icon>Parametrlər</button>
+                  <button type="button" class="btn" :class="r.dirty && '!border-accent !bg-accent !text-onaccent'" @click="saveCur()" x-show="!r.data.error"><iconify-icon icon="lucide:save"></iconify-icon>Saxla</button>
+                  <button type="button" class="btn" @click="closeResult()" title="Bu nəticəni siyahıdan çıxar"><iconify-icon icon="lucide:x"></iconify-icon>Bağla</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="mx-auto max-w-[1400px] space-y-6 px-4 py-6 sm:px-8">
+              <!-- parametrlər (yenidən oxumaq üçün) -->
+              <section class="box" x-show="showSettings" x-transition>
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+                  <div class="flex items-center gap-3"><span class="sec-n">01</span><h2 class="font-display text-sm font-medium">Oxuma parametrləri</h2></div>
+                  <span class="lbl">Növbəti oxunuşa tətbiq olunur</span>
+                </div>
+                <div class="grid gap-px bg-line sm:grid-cols-2 lg:grid-cols-4">
+                  <template x-for="t in toggles" :key="t.key">
+                    <div class="bg-surface px-5 py-4">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center border border-line"><iconify-icon :icon="'lucide:' + t.icon"></iconify-icon></span><span class="lbl text-ink" x-text="t.title"></span></div>
+                        <button type="button" role="switch" class="sw mt-1" :aria-checked="opts[t.key]" :aria-label="t.title" @click="opts[t.key] = !opts[t.key]"></button>
+                      </div>
+                      <p class="mt-3 text-xs leading-relaxed text-muted" x-text="t.desc"></p>
+                    </div>
+                  </template>
+                </div>
+                <div class="flex items-center justify-end gap-2 border-t border-line px-5 py-3">
+                  <span class="mr-auto text-xs text-muted" x-show="!items.some((i) => (r.srcIds || []).includes(i.id))">Yenidən oxumaq üçün mənbə fayl lazımdır.</span>
+                  <button type="button" class="btn btn-accent" @click="run(r.srcIds)" :disabled="running || !items.some((i) => (r.srcIds || []).includes(i.id))"><iconify-icon icon="lucide:refresh-cw"></iconify-icon>Yenidən oxu</button>
+                </div>
+              </section>
+
+              <!-- xəta -->
+              <template x-if="r.data.error">
+                <section class="box p-8">
+                  <div class="flex items-start gap-4">
+                    <span class="grid h-10 w-10 shrink-0 place-items-center border border-err/40 text-err"><iconify-icon icon="lucide:triangle-alert"></iconify-icon></span>
+                    <div>
+                      <h2 class="font-display text-base font-medium">Bu fayl işlənmədi</h2>
+                      <p class="mt-1 text-sm text-muted" x-text="r.data.error"></p>
+                      <button type="button" class="btn mt-4" @click="go('workspace')">İş sahəsinə qayıt</button>
+                    </div>
+                  </div>
+                </section>
+              </template>
+
+              <template x-if="!r.data.error">
+                <div class="space-y-6">
+                  <!-- Mənbə + mətn -->
+                  <section class="box grid lg:grid-cols-2">
+                    <!-- mənbə -->
+                    <div class="min-w-0 border-b border-line lg:border-b-0 lg:border-r">
+                      <div class="flex items-center justify-between gap-2 border-b border-line px-5 py-3">
+                        <div class="flex items-center gap-3"><span class="sec-n">02</span><h2 class="font-display text-sm font-medium">Mənbə</h2></div>
+                        <div class="flex items-center" x-show="srcItems.length">
+                          <button type="button" class="btn btn-ico !h-7 !w-7" @click="zoom = Math.max(50, zoom - 25)" aria-label="Kiçilt"><span aria-hidden="true" class="text-base leading-none">−</span></button>
+                          <span class="w-12 border-y border-line bg-surface py-[5px] text-center font-mono text-[11px] tabular-nums" x-text="zoom + '%'"></span>
+                          <button type="button" class="btn btn-ico !h-7 !w-7" @click="zoom = Math.min(200, zoom + 25)" aria-label="Böyüt"><span aria-hidden="true" class="text-base leading-none">+</span></button>
+                        </div>
+                      </div>
+                      <div class="max-h-[640px] min-h-[200px] overflow-auto bg-raised p-4">
+                        <template x-if="!srcItems.length">
+                          <div class="flex flex-col items-center gap-2 px-4 py-16 text-center">
+                            <iconify-icon icon="lucide:image-off" class="text-2xl text-muted"></iconify-icon>
+                            <p class="text-sm text-muted">Bu qeyd üçün mənbə fayl saxlanılmayıb (köhnə tarixçə qeydi və ya fayl çox böyük idi).</p>
+                          </div>
+                        </template>
+                        <template x-for="it in srcItems" :key="it.id">
+                          <figure class="mb-4 last:mb-0">
+                            <figcaption class="mb-2 flex items-center justify-between gap-2">
+                              <span class="lbl truncate" x-text="it.file.name"></span>
+                              <a x-show="it.url" :href="it.url" target="_blank" rel="noopener" class="lbl inline-flex items-center gap-1 hover:text-ink">Aç <iconify-icon icon="lucide:external-link"></iconify-icon></a>
+                            </figcaption>
+                            <template x-if="kind(it) === 'img'">
+                              <div class="overflow-auto border border-line bg-surface"><img :src="it.url" :alt="it.file.name" @error="it.broken = true" class="block h-auto max-w-none" :style="`width:${zoom}%`" /></div>
+                            </template>
+                            <template x-if="kind(it) === 'pdf'">
+                              <iframe :src="it.url" :title="it.file.name" class="w-full border border-line bg-surface" :style="`height:${Math.round(zoom * 6.4)}px`"></iframe>
+                            </template>
+                            <template x-if="kind(it) === 'docx'">
+                              <div class="overflow-auto border border-line bg-raised" :style="`height:${Math.round(zoom * 6.4)}px`">
+                                <div x-init="docxRender($el, it.file)" :style="`zoom:${zoom / 100}`"></div>
+                              </div>
+                            </template>
+                            <template x-if="kind(it) === 'none'">
+                              <div class="flex items-center gap-3 border border-line bg-surface px-4 py-6">
+                                <iconify-icon :icon="'lucide:' + fileIcon(it.file.name)" class="text-2xl text-muted"></iconify-icon>
+                                <p class="text-sm text-muted">Bu formatın ön baxışı brauzerdə mümkün deyil.</p>
+                              </div>
+                            </template>
+                          </figure>
+                        </template>
+                      </div>
+                    </div>
+
+                    <!-- mətn -->
+                    <div class="min-w-0">
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+                        <div class="flex items-center gap-3"><span class="sec-n">03</span><h2 class="font-display text-sm font-medium">Mətn</h2></div>
+                        <div class="flex items-center">
+                          <button type="button" class="fchip" :aria-pressed="tab === 'fixed'" @click="tab = 'fixed'" x-text="r.data.llm_fixed ? 'Düzəldilmiş' : 'Mətn'"></button>
+                          <button type="button" class="fchip -ml-px" x-show="r.hasRaw" :aria-pressed="tab === 'raw'" @click="tab = 'raw'">Xam OCR</button>
+                          <button type="button" class="fchip -ml-px" x-show="r.hasRaw" :aria-pressed="tab === 'compare'" @click="tab = 'compare'">Müqayisə</button>
+                        </div>
+                      </div>
+                      <textarea x-show="tab === 'fixed' || !r.hasRaw" x-model="r.fixed" @input="r.dirty = true" class="editor" spellcheck="false" placeholder="Mətn burada görünəcək..." aria-label="Mətn"></textarea>
+                      <textarea x-show="tab === 'raw' && r.hasRaw" x-model="r.raw" @input="r.dirty = true" class="editor" spellcheck="false" aria-label="Xam OCR mətni"></textarea>
+                      <template x-if="tab === 'compare' && r.hasRaw">
+                        <div x-data="{ c: diffOf() }" class="bg-surface">
+                          <div class="grid sm:grid-cols-2">
+                            <div class="min-w-0 p-4"><p class="lbl mb-2">Xam OCR <span class="text-err" x-text="c.del ? '· ' + c.del + ' fərq' : ''"></span></p><pre class="cmp" x-html="c.a"></pre></div>
+                            <div class="min-w-0 border-t border-line p-4 sm:border-l sm:border-t-0"><p class="lbl mb-2">Düzəldilmiş <span class="text-ok" x-text="c.add ? '· ' + c.add + ' dəyişiklik' : ''"></span></p><pre class="cmp" x-html="c.b"></pre></div>
+                          </div>
+                          <p class="border-t border-line px-5 py-2 text-xs text-muted" x-show="c.skipped">Mətn çox böyük olduğu üçün fərqlər vurğulanmadı.</p>
+                        </div>
+                      </template>
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-t border-line px-5 py-3">
+                        <p class="text-xs text-muted">Hər hansı sətri düzəldib yükləməzdən əvvəl yoxlaya bilərsiniz.</p>
+                        <p class="font-mono text-[11px] tabular-nums text-muted" x-text="`${wordCount} söz · ${curText().length} simvol`"></p>
+                      </div>
+                    </div>
+                  </section>
+
+                  <!-- Cədvəllər + yan panel -->
+                  <div class="grid gap-6 lg:grid-cols-3">
+                    <section class="box lg:col-span-2">
+                      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+                        <div class="flex items-center gap-3"><span class="sec-n">04</span><h2 class="font-display text-sm font-medium">Aşkarlanan cədvəllər</h2></div>
+                        <div class="flex items-center gap-3">
+                          <span class="lbl" x-text="tables.length + ' cədvəl'"></span>
+                          <button type="button" class="btn btn-sm btn-ink" x-show="tables.length > 1" @click="exportXlsx(tables)"><iconify-icon icon="lucide:file-spreadsheet"></iconify-icon>Hamısı Excel-ə</button>
+                        </div>
+                      </div>
+                      <template x-if="!tables.length">
+                        <div class="flex items-start gap-3 px-5 py-8 text-sm text-muted">
+                          <iconify-icon icon="lucide:table-2" class="mt-0.5 text-lg"></iconify-icon>
+                          <p x-text="opts.tables ? 'Bu sənəddə cədvəl tapılmadı.' : 'Cədvəl aşkarlama söndürülüb. Parametrlərdən aktiv edib yenidən oxuyun.'"></p>
+                        </div>
+                      </template>
+                      <template x-for="(grid, n) in tables" :key="n">
+                        <div class="border-b border-line last:border-b-0">
+                          <div class="flex flex-wrap items-center gap-3 px-5 py-3">
+                            <span class="grid h-8 w-8 place-items-center border border-line"><iconify-icon icon="lucide:table-2"></iconify-icon></span>
+                            <div class="min-w-0"><p class="text-sm font-medium" x-text="'Cədvəl ' + (n + 1)"></p><p class="font-mono text-[11px] text-muted" x-text="`${grid.length} sətir · ${Math.max(0, ...grid.map(x => x.length))} sütun`"></p></div>
+                            <div class="ml-auto flex gap-2">
+                              <button type="button" class="btn btn-sm" @click="openTable = openTable === n ? null : n" :aria-expanded="openTable === n"><iconify-icon :icon="openTable === n ? 'lucide:eye-off' : 'lucide:eye'"></iconify-icon><span x-text="openTable === n ? 'Gizlət' : 'Bax'"></span></button>
+                              <button type="button" class="btn btn-sm btn-ink" @click="exportXlsx([grid], 'cedvel-' + (n + 1))"><iconify-icon icon="lucide:file-spreadsheet"></iconify-icon>Excel</button>
+                            </div>
+                          </div>
+                          <div x-show="openTable === n" x-transition class="max-h-96 overflow-auto border-t border-line bg-paper p-4">
+                            <table class="gridtbl"><template x-for="(row, ri) in grid" :key="ri"><tr><template x-for="(c, ci) in row" :key="ci"><td x-text="c"></td></template></tr></template></table>
+                          </div>
+                        </div>
+                      </template>
+                    </section>
+
+                    <div class="space-y-6">
+                      <section class="box">
+                        <div class="flex items-center justify-between border-b border-line px-5 py-3">
+                          <div class="flex items-center gap-3"><span class="sec-n">05</span><h2 class="font-display text-sm font-medium">Xəbərdarlıqlar</h2></div>
+                          <span class="border border-line bg-raised px-2 py-0.5 font-mono text-[11px] tabular-nums" x-text="warns.length"></span>
+                        </div>
+                        <template x-if="!warns.length">
+                          <div class="flex items-center gap-3 px-5 py-5 text-sm text-muted"><iconify-icon icon="lucide:circle-check" class="text-lg text-ok"></iconify-icon>Xəbərdarlıq yoxdur.</div>
+                        </template>
+                        <div class="divide-y divide-line">
+                          <template x-for="(w, i) in warns" :key="i">
+                            <div class="flex items-start gap-3 px-5 py-4">
+                              <span class="grid h-8 w-8 shrink-0 place-items-center border border-line"><iconify-icon :icon="'lucide:' + w.icon"></iconify-icon></span>
+                              <div class="min-w-0"><p class="lbl text-ink" x-text="w.title"></p><p class="mt-1 text-xs leading-relaxed text-muted" x-text="w.text"></p></div>
+                            </div>
+                          </template>
+                        </div>
+                        <div class="border-t border-line px-5 py-5" x-show="confPct != null">
+                          <div class="flex items-center justify-between"><span class="lbl">Orta etibarlılıq</span><span class="font-mono text-xs tabular-nums" :class="confPct < 60 ? 'text-accentText' : ''" x-text="confPct + '%'"></span></div>
+                          <div class="mt-3 flex gap-1" role="img" :aria-label="'Etibarlılıq ' + confPct + ' faiz'">
+                            <template x-for="n in 10"><span class="h-2 flex-1" :class="n <= Math.round(confPct / 10) ? (confPct < 60 ? 'bg-accent' : 'bg-ink') : 'bg-ink/15'"></span></template>
+                          </div>
+                          <p class="mt-2 text-xs text-muted" x-text="confPct < 60 ? 'Aşağıdır, mətni diqqətlə yoxlayın.' : confPct < 85 ? 'Orta səviyyədir, əsas yerləri yoxlayın.' : 'Yüksəkdir.'"></p>
+                        </div>
+                      </section>
+                    </div>
+                  </div>
+
+                  <!-- aşağı əməliyyat paneli -->
+                  <div class="box flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                    <div class="flex items-center gap-2 lbl">
+                      <iconify-icon :icon="r.dirty ? 'lucide:pencil' : 'lucide:circle-check'" :class="r.dirty ? 'text-accentText' : 'text-ink'"></iconify-icon>
+                      <span x-text="r.dirty ? 'Saxlanılmamış dəyişikliklər var' : r.hid ? 'Tarixçədə saxlanılıb' : 'Dəyişiklik yoxdur'"></span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button type="button" class="btn" @click="copyCur()"><iconify-icon icon="lucide:copy"></iconify-icon>Kopyala</button>
+                      <button type="button" class="btn" @click="dlTxt()"><iconify-icon icon="lucide:file-text"></iconify-icon>.txt</button>
+                      <button type="button" class="btn btn-ink" @click="exportDocx()"><iconify-icon icon="lucide:file-type-2"></iconify-icon>.docx</button>
+                      <button type="button" class="btn btn-ink" @click="exportXlsx(tables)" :disabled="!tables.length"><iconify-icon icon="lucide:table"></iconify-icon>.xlsx</button>
+                      <button type="button" class="btn btn-accent" @click="dlPdf()" :disabled="running || !usable"><iconify-icon icon="lucide:file-search"></iconify-icon>Axtarışlı PDF</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- ====================================================================== -->
+      <!-- ============================== TARİXÇƏ =============================== -->
+      <!-- ====================================================================== -->
+      <div x-show="page === 'history'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="border-b border-line">
+          <div class="mx-auto flex max-w-[1400px] flex-wrap items-end justify-between gap-4 px-4 py-6 sm:px-8">
+            <div class="min-w-0">
+              <div class="lbl flex items-center gap-2"><span>Kitabxana</span><span class="text-line">/</span><span class="text-ink">Tarixçə</span></div>
+              <h1 class="mt-2 font-display text-xl font-semibold tracking-tight">Son nəticələr</h1>
+              <p class="mt-1 text-sm text-muted" x-show="cfg.auth_required">Son <span x-text="HMAX"></span> nəticənin mətni və cədvəlləri hesabınızda saxlanılır və bütün cihazlarınızda görünür. Mənbə fayllar yalnız bu brauzerdə qalır.</p>
+              <p class="mt-1 text-sm text-muted" x-show="!cfg.auth_required">Son <span x-text="HMAX"></span> nəticə (mətn, cədvəllər və mənbə fayllar) yalnız bu brauzerdə saxlanılır. Ehtiyat üçün ixrac edib başqa cihazda idxal edə bilərsiniz.</p>
+            </div>
+            <div class="relative w-full sm:w-72">
+              <iconify-icon icon="lucide:search" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted"></iconify-icon>
+              <input type="search" x-model="hq" class="field pl-8" placeholder="Ad və ya mətn üzrə axtar" aria-label="Tarixçədə axtar" />
+            </div>
+          </div>
+        </div>
+
+        <div class="mx-auto max-w-[1400px] space-y-6 px-4 py-8 sm:px-8">
+          <!-- yaddaş -->
+          <div class="box px-5 py-4">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-3"><iconify-icon icon="lucide:hard-drive" class="text-muted"></iconify-icon><span class="text-sm font-medium">Brauzer yaddaşı</span><span class="text-xs text-muted" x-text="`${(histUsed / 1048576).toFixed(1)} MB istifadə olunub (təxminən ${(QUOTA / 1048576).toFixed(0)} MB-dan)`"></span></div>
+              <div class="flex flex-wrap items-center gap-3"><span class="lbl" x-show="persisted">Avtomatik silinmir</span><span class="lbl" x-text="cfg.auth_required ? 'Mətn hesabla sinxronlaşır' : 'Serverə göndərilmir'"></span></div>
+            </div>
+            <div class="mt-3 flex gap-1" role="img" :aria-label="'Yaddaş ' + Math.round(histUsed / QUOTA * 100) + ' faiz'">
+              <template x-for="n in 20"><span class="h-2 flex-1" :class="n <= Math.ceil(histUsed / QUOTA * 20) ? (histUsed / QUOTA > .75 ? 'bg-accent' : 'bg-ink') : 'bg-ink/15'"></span></template>
+            </div>
+          </div>
+
+          <section class="box overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-line px-5 py-3">
+              <div class="flex items-center gap-3"><span class="sec-n">01</span><h2 class="font-display text-sm font-medium">Nəticələr</h2><span class="chip" x-text="filteredHist.length"></span></div>
+              <div class="flex flex-wrap gap-2">
+                <button type="button" class="btn btn-sm" :disabled="!hist.length || histBusy" @click="exportHist()"><iconify-icon icon="lucide:download"></iconify-icon><span x-text="hpick.length ? `İxrac et (${hpick.length})` : 'İxrac et'"></span></button>
+                <button type="button" class="btn btn-sm" :disabled="histBusy" @click="$refs.histFile.click()"><iconify-icon icon="lucide:upload"></iconify-icon>İdxal et</button>
+                <input type="file" x-ref="histFile" accept=".json,application/json" hidden @change="importHist($el.files[0]); $el.value = ''" />
+                <button type="button" class="btn btn-sm" x-show="hpick.length" @click="delPicked()"><iconify-icon icon="lucide:trash-2"></iconify-icon>Seçilmişləri sil (<span x-text="hpick.length"></span>)</button>
+                <button type="button" class="btn btn-sm" :disabled="!hist.length" @click="confirmClear = !confirmClear"><iconify-icon icon="lucide:eraser"></iconify-icon>Hamısını təmizlə</button>
+              </div>
+            </div>
+            <div x-show="confirmClear" x-transition class="flex flex-wrap items-center gap-3 border-b border-line bg-raised px-5 py-3">
+              <iconify-icon icon="lucide:triangle-alert" class="text-accentText"></iconify-icon>
+              <p class="text-sm">Bütün tarixçə silinəcək. Bu əməliyyat geri qaytarılmır.</p>
+              <div class="ml-auto flex gap-2"><button type="button" class="btn btn-sm" @click="confirmClear = false">Ləğv et</button><button type="button" class="btn btn-sm btn-accent" @click="clearHist()">Hə, sil</button></div>
+            </div>
+
+            <template x-if="!filteredHist.length">
+              <div class="flex flex-col items-center gap-3 px-6 py-14 text-center">
+                <span class="grid h-12 w-12 place-items-center border border-line text-muted"><iconify-icon icon="lucide:history" class="text-xl"></iconify-icon></span>
+                <p class="text-sm text-muted" x-text="hist.length ? 'Axtarışa uyğun nəticə tapılmadı.' : 'Tarixçə boşdur. Emal olunan nəticələr burada görünəcək.'"></p>
+              </div>
+            </template>
+            <div class="overflow-x-auto" x-show="filteredHist.length">
+              <table class="tbl">
+                <thead>
+                  <tr>
+                    <th class="w-10"><input type="checkbox" class="accent-[rgb(var(--c-accent))]" aria-label="Hamısını seç" :checked="hpick.length && hpick.length === filteredHist.length" @change="hpick = $event.target.checked ? filteredHist.map(h => h.id) : []" /></th>
+                    <th>Ad</th>
+                    <th class="hidden md:table-cell">Metod</th>
+                    <th class="hidden text-right md:table-cell">Səhifə</th>
+                    <th class="hidden lg:table-cell">Etibarlılıq</th>
+                    <th class="hidden sm:table-cell">Tarix</th>
+                    <th class="text-right">Əməliyyat</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-for="h in filteredHist" :key="h.id">
+                    <tr class="row-link" @click="openHist(h)">
+                      <td @click.stop><input type="checkbox" class="accent-[rgb(var(--c-accent))]" :aria-label="'Seç: ' + h.label" :checked="hpick.includes(h.id)" @change="hpick = hpick.includes(h.id) ? hpick.filter(i => i !== h.id) : [...hpick, h.id]" /></td>
+                      <td>
+                        <div class="flex min-w-0 items-center gap-3">
+                          <span class="grid h-8 w-8 shrink-0 place-items-center border border-line bg-paper"><iconify-icon :icon="'lucide:' + fileIcon(h.label)" class="text-sm"></iconify-icon></span>
+                          <div class="min-w-0"><p class="max-w-[16rem] truncate font-medium sm:max-w-md" x-text="h.label"></p><p class="max-w-[16rem] truncate text-xs text-muted sm:max-w-md" x-text="(h.fixed || '').replace(/\s+/g, ' ').slice(0, 90)"></p></div>
+                        </div>
+                      </td>
+                      <td class="hidden md:table-cell"><span class="chip" x-show="h.method" x-text="methodLabel(h.method)"></span><span class="chip ml-1" x-show="h.llm">LLM</span></td>
+                      <td class="hidden text-right font-mono text-xs tabular-nums md:table-cell" x-text="h.pages ?? '—'"></td>
+                      <td class="hidden font-mono text-xs tabular-nums lg:table-cell" x-text="h.conf == null ? '—' : Math.round(h.conf * 100) + '%'"></td>
+                      <td class="hidden font-mono text-xs text-muted sm:table-cell" x-text="fmtDate(h.ts)"></td>
+                      <td @click.stop>
+                        <div class="flex items-center justify-end gap-1.5">
+                          <button type="button" class="btn btn-sm btn-ink" @click="openHist(h)">Aç</button>
+                          <button type="button" class="btn btn-sm hidden sm:inline-flex" @click="saveBlob(new Blob([h.fixed], { type: 'text/plain;charset=utf-8' }), fileStem(h.label) + '.txt')">.txt</button>
+                          <button type="button" class="btn btn-sm hidden sm:inline-flex" @click="exportDocx(h.fixed, fileStem(h.label))">.docx</button>
+                          <button type="button" class="btn btn-sm btn-ico !h-7 !w-7" @click="delHist(h.id)" :aria-label="'Sil: ' + h.label"><span aria-hidden="true" class="text-base leading-none">×</span></button>
+                        </div>
+                      </td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <!-- ====================================================================== -->
+      <!-- ============================ API VƏ GİRİŞ ============================ -->
+      <!-- ====================================================================== -->
+      <div x-show="page === 'api'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
+        <div class="border-b border-line">
+          <div class="mx-auto flex max-w-[1400px] flex-wrap items-end justify-between gap-4 px-4 py-6 sm:px-8">
+            <div class="min-w-0">
+              <div class="lbl flex items-center gap-2"><span>Tənzimləmə</span><span class="text-line">/</span><span class="text-ink">API və giriş</span></div>
+              <h1 class="mt-2 font-display text-xl font-semibold tracking-tight">API və giriş</h1>
+              <p class="mt-1 text-sm text-muted">Eyni serverin API-sını skriptlərdən də çağıra bilərsiniz.</p>
+            </div>
+            <div class="flex items-center gap-2"><span class="lbl">Baza ünvan</span><code class="border border-line bg-surface px-2 py-1 font-mono text-xs" x-text="origin"></code><button type="button" class="btn btn-ico" @click="copy(origin, 'Ünvan kopyalandı')" aria-label="Ünvanı kopyala"><iconify-icon icon="lucide:copy"></iconify-icon></button></div>
+          </div>
+        </div>
+
+        <div class="mx-auto max-w-[1400px] space-y-8 px-4 py-8 sm:px-8">
+          <!-- 01 endpointlər -->
+          <section>
+            <div class="mb-3 flex items-center gap-3"><span class="sec-n">01</span><h2 class="font-display text-sm font-medium">Endpoint-lər</h2><span class="chip" x-text="endpoints.length + ' endpoint'"></span></div>
+            <div class="box overflow-hidden">
+              <template x-for="e in endpoints" :key="e.p">
+                <div class="border-b border-line last:border-b-0">
+                  <button type="button" class="flex w-full items-center gap-4 px-5 py-3.5 text-left transition-colors hover:bg-raised/60" @click="openEp = openEp === e.p ? null : e.p" :aria-expanded="openEp === e.p">
+                    <span class="w-14 shrink-0 border px-2 py-0.5 text-center font-mono text-[10px] font-medium" :class="e.m === 'GET' ? 'border-ok/40 bg-ok/10 text-ok' : 'border-accent/40 bg-accent/10 text-accentText'" x-text="e.m"></span>
+                    <code class="shrink-0 font-mono text-sm" x-text="e.p"></code>
+                    <span class="hidden min-w-0 flex-1 truncate text-sm text-muted md:block" x-text="e.d"></span>
+                    <iconify-icon icon="lucide:chevron-down" class="ml-auto shrink-0 text-muted transition-transform" :class="openEp === e.p && 'rotate-180'"></iconify-icon>
+                  </button>
+                  <div x-show="openEp === e.p" x-transition class="space-y-4 border-t border-line bg-paper px-5 py-4">
+                    <p class="text-sm text-muted" x-text="e.d"></p>
+                    <div x-show="e.params.length">
+                      <p class="lbl mb-2">Parametrlər</p>
+                      <dl class="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]"><template x-for="p in e.params" :key="p[0]"><div class="contents"><dt class="font-mono text-xs" x-text="p[0]"></dt><dd class="text-muted" x-text="p[1]"></dd></div></template></dl>
+                    </div>
+                    <div>
+                      <div class="mb-2 flex items-center justify-between"><p class="lbl">Nümunə</p><button type="button" class="btn btn-sm" @click="copy(e.curl, 'Əmr kopyalandı')"><iconify-icon icon="lucide:copy"></iconify-icon>Kopyala</button></div>
+                      <pre class="code" x-text="e.curl"></pre>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </section>
+
+          <div class="grid gap-8 lg:grid-cols-2">
+            <!-- 02 giriş -->
+            <section>
+              <div class="mb-3 flex items-center gap-3"><span class="sec-n">02</span><h2 class="font-display text-sm font-medium">Giriş</h2>
+                <span class="ml-auto inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium" :class="cfg.auth_required ? 'bg-accent/10 text-accentText' : 'bg-raised text-muted'"><span class="h-1.5 w-1.5" :class="cfg.auth_required ? 'bg-accent' : 'bg-muted'"></span><span x-text="cfg.auth_required ? 'Hesab tələb olunur' : 'Tələb olunmur'"></span></span>
+              </div>
+              <div class="box space-y-4 p-5">
+                <template x-if="!cfg.auth_required">
+                  <p class="text-sm text-muted">Bu serverdə giriş aktiv deyil, istənilən sorğu qəbul olunur. Hesab rejimi üçün serverdə <code class="font-mono text-xs">APP_PASSWORD</code> (qeydiyyat kodu) mühit dəyişənini təyin edin.</p>
+                </template>
+                <template x-if="cfg.auth_required">
+                  <div class="space-y-4">
+                    <p class="text-sm text-muted">Sorğularda <code class="font-mono text-xs">Authorization: Bearer NISAN</code> başlığı göndərilir. Nişan <code class="font-mono text-xs">POST /api/auth/login</code> ilə alınır və 30 gün etibarlıdır. Bu brauzerdə nişan çıxış edənə qədər yadda qalır.</p>
+                    <div class="flex flex-wrap items-center gap-3">
+                      <span class="inline-flex items-center gap-2 text-sm text-ok"><span class="h-1.5 w-1.5 bg-ok"></span><span x-text="me ? 'Daxil olunub: ' + me.username : 'Daxil olunub'"></span></span>
+                      <button type="button" class="btn" @click="logout()"><iconify-icon icon="lucide:log-out"></iconify-icon>Çıxış</button>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 text-sm" x-show="me && me.email">
+                      <span class="text-muted" x-text="me && me.email"></span>
+                      <span class="text-ok" x-show="me && me.verified">təsdiqlənib</span>
+                      <template x-if="me && !me.verified">
+                        <span class="inline-flex flex-wrap items-center gap-3"><span class="text-warn">təsdiqlənməyib</span>
+                          <button type="button" class="btn" x-show="cfg.mail" :disabled="acct.mailBusy" @click="resendVerify()"><iconify-icon icon="lucide:mail-check"></iconify-icon>Link göndər</button></span>
+                      </template>
+                    </div>
+                    <form class="space-y-2 border-t border-line pt-4" @submit.prevent="changePassword()">
+                      <p class="lbl">Parolu dəyiş</p>
+                      <input type="password" class="field" x-model="acct.cur" @input="acct.err = ''" autocomplete="current-password" placeholder="Cari parol" aria-label="Cari parol" />
+                      <input type="password" class="field" x-model="acct.next" @input="acct.err = ''" autocomplete="new-password" placeholder="Yeni parol (ən azı 8 simvol)" aria-label="Yeni parol" />
+                      <p class="min-h-[1rem] text-xs text-err" x-text="acct.err"></p>
+                      <button type="submit" class="btn" :disabled="acct.busy"><iconify-icon icon="lucide:key-round"></iconify-icon><span x-text="acct.busy ? 'Gözləyin...' : 'Parolu yenilə'"></span></button>
+                    </form>
+                    <div class="space-y-2 border-t border-line pt-4">
+                      <p class="lbl">Hesabı sil</p>
+                      <button type="button" class="btn" x-show="!acct.delOpen" @click="acct.delOpen = true"><iconify-icon icon="lucide:trash-2"></iconify-icon>Hesabı sil</button>
+                      <form class="space-y-2" x-show="acct.delOpen" @submit.prevent="deleteAccount()">
+                        <p class="text-sm text-muted">Hesab, serverdəki tarixçə və işləriniz həmişəlik silinəcək. Geri qaytarmaq olmur. Təsdiq üçün parolu yazın.</p>
+                        <input type="password" class="field" x-model="acct.delPass" @input="acct.delErr = ''" autocomplete="current-password" placeholder="Parol" aria-label="Parol" />
+                        <p class="min-h-[1rem] text-xs text-err" x-text="acct.delErr"></p>
+                        <div class="flex gap-2">
+                          <button type="submit" class="btn btn-solid" :disabled="acct.delBusy"><iconify-icon icon="lucide:trash-2"></iconify-icon><span x-text="acct.delBusy ? 'Gözləyin...' : 'Həmişəlik sil'"></span></button>
+                          <button type="button" class="btn" @click="acct.delOpen = false; acct.delPass = ''; acct.delErr = ''">Ləğv et</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </section>
+
+            <!-- 03 limitlər -->
+            <section>
+              <div class="mb-3 flex items-center gap-3"><span class="sec-n">03</span><h2 class="font-display text-sm font-medium">Limitlər</h2></div>
+              <div class="box grid grid-cols-3 divide-x divide-line">
+                <div class="p-5"><p class="lbl">Fayl sayı</p><p class="mt-2 font-display text-2xl font-semibold tabular-nums" x-text="cfg.max_files"></p><p class="mt-1 text-xs text-muted">bir sorğuda</p></div>
+                <div class="p-5"><p class="lbl">Fayl ölçüsü</p><p class="mt-2 font-display text-2xl font-semibold tabular-nums"><span x-text="cfg.max_mb"></span><span class="ml-1 text-sm font-normal text-muted">MB</span></p><p class="mt-1 text-xs text-muted">hər fayl üçün</p></div>
+                <div class="p-5"><p class="lbl">OpenCV</p><p class="mt-2 font-display text-2xl font-semibold" x-text="cfg.opencv ? 'Var' : 'Yoxdur'"></p><p class="mt-1 text-xs text-muted">skan təmizləmə</p></div>
+              </div>
+              <p class="mt-3 text-xs text-muted">IP başına sorğu limiti serverdə <code class="font-mono">RATE_LIMIT</code> ilə təyin olunur. Limit aşılanda server 429 qaytarır.</p>
+            </section>
+          </div>
+
+          <!-- 04 sorğu jurnalı -->
+          <section>
+            <div class="mb-3 flex items-center gap-3"><span class="sec-n">04</span><h2 class="font-display text-sm font-medium">Sorğu jurnalı</h2><span class="chip">bu sessiya</span>
+              <button type="button" class="btn btn-sm ml-auto" @click="log = []" :disabled="!log.length"><iconify-icon icon="lucide:eraser"></iconify-icon>Təmizlə</button>
+            </div>
+            <div class="box overflow-hidden">
+              <template x-if="!log.length"><p class="px-5 py-10 text-center text-sm text-muted">Hələ sorğu göndərilməyib. Bu səhifə açıldıqdan sonrakı sorğular burada görünəcək.</p></template>
+              <div class="overflow-x-auto" x-show="log.length">
+                <table class="tbl">
+                  <thead><tr><th>Metod</th><th>Endpoint</th><th>Status</th><th class="text-right">Gecikmə</th><th>Vaxt</th></tr></thead>
+                  <tbody>
+                    <template x-for="l in log" :key="l.id">
+                      <tr>
+                        <td class="font-mono text-xs" x-text="l.method"></td>
+                        <td class="font-mono text-xs" x-text="l.path"></td>
+                        <td><span class="inline-flex px-2 py-0.5 font-mono text-xs font-medium" :class="l.status >= 200 && l.status < 300 ? 'bg-ok/10 text-ok' : l.status >= 400 && l.status < 500 ? 'bg-warn/10 text-warn' : 'bg-err/10 text-err'" x-text="l.status || 'xəta'"></span></td>
+                        <td class="text-right font-mono text-xs tabular-nums" x-text="l.ms.toLocaleString('az-AZ') + ' ms'"></td>
+                        <td class="font-mono text-xs text-muted" x-text="fmtDate(l.ts, true)"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ Kamera ============ -->
+  <div x-show="cam.open" x-transition.opacity class="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4" role="dialog" aria-modal="true" aria-label="Kamera ilə skan">
+    <div class="box w-full max-w-3xl p-4">
+      <div class="mb-3 flex items-center justify-between"><h2 class="font-display text-base font-medium">Kamera ilə skan</h2><span class="lbl" x-text="cam.shots ? 'Çəkilən səhifə: ' + cam.shots : 'Sənədi çərçivəyə alın'"></span></div>
+      <video x-ref="video" autoplay playsinline muted class="block max-h-[60vh] w-full bg-black"></video>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button type="button" class="btn btn-accent" @click="takeShot()"><iconify-icon icon="lucide:camera"></iconify-icon>Şəkil çək</button>
+        <button type="button" class="btn btn-solid" @click="camDone()" :disabled="!cam.shots">Bitir və oxu</button>
+        <button type="button" class="btn ml-auto" @click="closeCam()">Bağla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ Sürükləmə örtüyü ============ -->
+  <div x-show="dragDepth > 0" x-transition.opacity class="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-paper/80 backdrop-blur-sm">
+    <div class="border-2 border-dashed border-accent bg-surface px-10 py-8 text-center">
+      <iconify-icon icon="lucide:upload-cloud" class="text-3xl text-accentText"></iconify-icon>
+      <p class="mt-2 font-display text-lg font-medium">Faylları buraxın</p>
+    </div>
+  </div>
+
+  <!-- ============ Bildirişlər ============ -->
+  <div class="pointer-events-none fixed bottom-4 right-4 z-[60] flex w-[min(92vw,380px)] flex-col gap-2" role="status" aria-live="polite">
+    <template x-for="t in toasts" :key="t.id">
+      <div class="pointer-events-auto flex items-start gap-3 border border-line border-l-4 bg-surface px-4 py-3 shadow-lg"
+           :class="{ 'border-l-ok': t.kind === 'ok', 'border-l-warn': t.kind === 'warn', 'border-l-err': t.kind === 'err', 'border-l-ink': !t.kind }"
+           x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-2" x-transition:leave="transition ease-in duration-150" x-transition:leave-end="opacity-0">
+        <p class="min-w-0 flex-1 break-words text-sm" x-text="t.msg"></p>
+        <button type="button" class="text-muted hover:text-ink" @click="dismiss(t.id)" aria-label="Bağla"><span aria-hidden="true" class="text-base leading-none">×</span></button>
+      </div>
+    </template>
+  </div>
+
+<script>
+  function app() {
+    const HKEY = "az-ocr-history", HMAX = 100, QUOTA = 200 * 1048576, HFILES_MAX = 15 * 1048576;
+    const sleep = (ms, signal) => new Promise((res, rej) => {
+      const t = setTimeout(res, ms);
+      if (signal) signal.addEventListener("abort", () => { clearTimeout(t); rej(new DOMException("Aborted", "AbortError")); }, { once: true });
+    });
+    // Tarixçə IndexedDB-də saxlanılır: mətn, cədvəllər və mənbə fayllar (localStorage 5 MB-la məhduddur)
+    // Hər istifadəçinin yerli yaddaşı ayrıdır ("az-ocr-u<nömrə>"), eyni brauzerdə qarışmasın
+    const makeIdb = (dbName) => {
+      let dbp = null;
+      const open = () => dbp || (dbp = new Promise((res, rej) => {
+        if (!window.indexedDB) return rej(new Error("IndexedDB yoxdur"));
+        const rq = indexedDB.open(dbName, 1);
+        rq.onupgradeneeded = () => { rq.result.createObjectStore("hist", { keyPath: "id" }); rq.result.createObjectStore("files", { keyPath: "id" }); };
+        rq.onsuccess = () => res(rq.result);
+        rq.onerror = () => rej(rq.error);
+      }));
+      const run = async (store, mode, fn) => {
+        const db = await open();
+        return new Promise((res, rej) => {
+          const t = db.transaction(store, mode);
+          const rq = fn(t.objectStore(store));
+          t.oncomplete = () => res(rq ? rq.result : undefined);
+          t.onerror = t.onabort = () => rej(t.error);
+        });
+      };
+      return {
+        all: (st) => run(st, "readonly", (o) => o.getAll()),
+        get: (st, k) => run(st, "readonly", (o) => o.get(k)),
+        put: (st, v) => run(st, "readwrite", (o) => o.put(v)),
+        del: (st, k) => run(st, "readwrite", (o) => o.delete(k)),
+        clear: (st) => run(st, "readwrite", (o) => o.clear()),
+      };
+    };
+    let idb = makeIdb("az-ocr");
+    const OCR_EXT = /\.(pdf|jpe?g|png|bmp|tiff?|webp|gif|heic|heif)$/i;
+    const PDF_SRC_EXT = /\.(pdf|jpe?g|png|bmp|tiff?|webp|gif|heic|heif|docx)$/i;   // axtarışlı PDF üçün (DOCX də olur)
+    const IMG_OK = /\.(jpe?g|png|bmp|webp|gif)$/i;
+    const METHODS = { "pdf-text-layer": "PDF mətn qatı", "document-text": "Sənəd mətni", "azure-ocr": "Azure OCR", merged: "Birləşdirilmiş" };
+    const ST = {
+      idle: { label: "Hazır", cls: "bg-raised text-muted", dot: "bg-muted" },
+      run: { label: "Emal olunur", cls: "bg-accent/10 text-accentText", dot: "bg-accent" },
+      ok: { label: "Tamam", cls: "bg-ok/10 text-ok", dot: "bg-ok" },
+      warn: { label: "Yoxlayın", cls: "bg-warn/10 text-warn", dot: "bg-warn" },
+      err: { label: "Xəta", cls: "bg-err/10 text-err", dot: "bg-err" },
+    };
+    const EMPTY = { label: "", fixed: "", raw: "", srcIds: [], hid: null, dirty: false, hasRaw: false, data: {} };
+    const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    return {
+      HMAX, QUOTA, ST,
+      page: "workspace", navOpen: false, online: null,
+      cfg: { auth_required: false, mail: false, max_files: 20, max_mb: 10, opencv: false, docx_pdf: false },
+      token: "", me: null, auth: { mode: "login", user: "", email: "", pass: "", invite: "", show: false, busy: false, err: "", info: "", resetToken: "" },
+      acct: { cur: "", next: "", err: "", busy: false, mailBusy: false, delOpen: false, delPass: "", delErr: "", delBusy: false },
+      authed: false, boot: false, lastSync: 0, syncing: false,
+      collapsed: false,
+      opts: { fix: true, enhance: true, tables: false, merge: false },
+      items: [], nextId: 1, filter: "all", q: "", picked: [],
+      results: [], sel: 0, tab: "fixed", zoom: 100, showSettings: false, openTable: null,
+      running: false, elapsed: 0, abortCtl: null, timer: null, jobId: null, progress: { done: 0, total: 0 },
+      histBusy: false, persisted: false, persistAsked: false,
+      hist: [], hq: "", hpick: [], confirmClear: false,
+      log: [], logId: 1, openEp: null,
+      toasts: [], toastId: 1,
+      dragDepth: 0, cam: { open: false, shots: 0, stream: null },
+      filters: [["all", "Hamısı"], ["idle", "Hazır"], ["run", "Emal"], ["ok", "Tamam"], ["warn", "Yoxlayın"], ["err", "Xəta"]],
+
+      // ---------- başlanğıc ----------
+      init() {
+        try { this.token = localStorage.getItem("az_token") || ""; } catch {}
+        try { this.collapsed = localStorage.getItem("az_side_collapsed") === "1"; } catch {}
+        try {   // e-poçtdakı parol bərpa linki: ?reset=NIŞAN
+          const rt = new URLSearchParams(location.search).get("reset");
+          if (rt) {
+            this.auth.resetToken = rt; this.auth.mode = "reset";
+            window.history.replaceState(null, "", location.pathname + location.hash);   // nişan ünvan sətrində qalmasın
+          }
+        } catch {}
+        let verifyToken = "";
+        try {   // e-poçtdakı təsdiq linki: ?verify=NIŞAN
+          verifyToken = new URLSearchParams(location.search).get("verify") || "";
+          if (verifyToken) window.history.replaceState(null, "", location.pathname + location.hash);
+        } catch {}
+        this.route();
+        window.addEventListener("hashchange", () => this.route());
+        window.addEventListener("pagehide", () => this.closeCam());
+        fetch("/api/config").then((r) => r.json()).then(async (c) => {
+          this.online = true;
+          this.cfg.auth_required = !!c.auth_required;
+          this.cfg.mail = !!c.mail;
+          this.cfg.opencv = !!c.opencv;
+          this.cfg.docx_pdf = !!c.docx_pdf;
+          if (c.max_files) this.cfg.max_files = c.max_files;
+          if (c.max_mb) this.cfg.max_mb = c.max_mb;
+          if (verifyToken && c.auth_required) await this.confirmEmail(verifyToken);
+          if (!c.auth_required) { await this.startSession(null); return; }
+          // saxlanmış nişan varsa səssiz yoxla, yoxsa giriş pəncərəsi açılacaq
+          if (this.token && !this.auth.resetToken) { this.boot = true; await this.verifyToken(); this.boot = false; }
+        }).catch(() => { this.online = false; this.boot = false; this.loadHist(); });
+      },
+      get gate() { return this.cfg.auth_required && !this.authed && !this.boot; },
+      isDesk() { return window.matchMedia("(min-width: 1024px)").matches; },
+      toggleNav() {
+        if (this.isDesk()) this.setCollapsed(!this.collapsed);
+        else this.navOpen = !this.navOpen;
+      },
+      closeNav() { if (this.isDesk()) this.setCollapsed(true); else this.navOpen = false; },
+      setCollapsed(v) { this.collapsed = v; try { localStorage.setItem("az_side_collapsed", v ? "1" : "0"); } catch {} },
+      get nav() {
+        return [
+          { id: "workspace", label: "İş sahəsi", icon: "layout-dashboard", count: () => this.items.length },
+          { id: "result", label: "Nəticə", icon: "scan-text", count: () => this.results.length },
+          { id: "history", label: "Tarixçə", icon: "history", count: () => this.hist.length },
+          { id: "api", label: "API və giriş", icon: "terminal", count: () => 0 },
+        ];
+      },
+      route() {
+        const p = (location.hash.match(/^#\/(\w+)/) || [])[1];
+        this.page = ["workspace", "result", "history", "api"].includes(p) ? p : "workspace";
+        this.navOpen = false;
+        if (this.page === "history") this.syncHist();
+        window.scrollTo(0, 0);
+      },
+      go(p) { if (location.hash === "#/" + p) this.route(); else location.hash = "/" + p; },
+      get origin() { return location.origin; },
+
+      // ---------- köməkçilər ----------
+      toast(msg, kind = "") {
+        const id = this.toastId++;
+        this.toasts.push({ id, msg, kind });
+        setTimeout(() => this.dismiss(id), kind === "err" || kind === "warn" ? 8000 : 4000);
+      },
+      dismiss(id) { this.toasts = this.toasts.filter((t) => t.id !== id); },
+      fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; },
+      fmtDate(ts, withSec) {
+        const o = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
+        if (withSec) o.second = "2-digit";
+        return new Date(ts).toLocaleString("az-AZ", o);
+      },
+      extOf(name) { const m = /\.([^.]+)$/.exec(name || ""); return m ? m[1].slice(0, 4) : "fayl"; },
+      fileStem(name) { return (String(name || "netice").replace(/\.[^.]+$/, "").replace(/[^\p{L}\p{N}_-]+/gu, "-").replace(/^-+|-+$/g, "") || "netice").slice(0, 60); },
+      fileIcon(name) {
+        const e = this.extOf(name).toLowerCase();
+        if (e === "pdf") return "file-text";
+        if (["xlsx", "csv"].includes(e)) return "file-spreadsheet";
+        if (["pptx"].includes(e)) return "presentation";
+        if (["jpg", "jpeg", "png", "bmp", "tif", "tiff", "webp", "gif", "heic", "heif"].includes(e)) return "image";
+        if (["html", "htm"].includes(e)) return "file-code";
+        return "file-type-2";
+      },
+      methodLabel(m) { return String(m || "").split("+").map((x) => METHODS[x] || x).join(" + "); },
+      saveBlob(blob, name) {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob); a.download = name; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      },
+      async copy(text, msg = "Kopyalandı") {
+        try { await navigator.clipboard.writeText(text); this.toast(msg, "ok"); }
+        catch { this.toast("Kopyalamaq üçün icazə yoxdur, mətni əl ilə seçin.", "warn"); }
+      },
+      authHeaders() { return this.cfg.auth_required && this.token ? { Authorization: "Bearer " + this.token } : {}; },
+      async errorOf(res) {
+        const body = await res.json().catch(() => ({}));
+        const d = body.detail;
+        if (typeof d === "string") return d;
+        if (Array.isArray(d) && d[0] && d[0].msg) return d[0].msg;
+        if (res.status === 429) return "Çox sorğu göndərildi, bir az gözləyin.";
+        if (res.status === 401) return "Sessiya bitib, yenidən daxil olun.";
+        return body.error || "Xəta: " + res.status;
+      },
+      netMsg(err) { return err && err.name === "TypeError" ? "Serverə qoşulmaq olmadı." : (err && err.message) || "Naməlum xəta."; },
+      // bütün sorğular buradan keçir: giriş nişanı başlığı və jurnal
+      async api(path, opts = {}) {
+        const t0 = performance.now();
+        opts.headers = { ...(opts.headers || {}), ...this.authHeaders() };
+        let status = 0;
+        try {
+          const res = await fetch(path, opts);
+          status = res.status;
+          if (status === 401 && this.cfg.auth_required && this.token) this.clearAuth();
+          return res;
+        } catch (e) { throw e; }
+        finally {
+          this.log.unshift({ id: this.logId++, ts: Date.now(), method: opts.method || "GET", path: path.split("?")[0], status, ms: Math.round(performance.now() - t0) });
+          if (this.log.length > 50) this.log.length = 50;
+        }
+      },
+
+      // ---------- giriş (hesab) ----------
+      clearAuth() {
+        this.authed = false; this.token = "";
+        try { localStorage.removeItem("az_token"); } catch {}
+      },
+      setAuthMode(mode) {
+        const a = this.auth;
+        a.mode = mode; a.err = ""; a.info = ""; a.pass = ""; a.show = false;
+      },
+      authUserLabel() {
+        const m = this.auth.mode;
+        return m === "register" ? "İstifadəçi adı" : m === "forgot" ? "E-poçt və ya istifadəçi adı" : "İstifadəçi adı / e-poçt";
+      },
+      authHint() {
+        const m = this.auth.mode;
+        if (m === "register") return "Yeni hesab açmaq üçün sizə verilən qeydiyyat kodu lazımdır. E-poçt parolu bərpa etmək üçündür.";
+        if (m === "forgot") return "Hesabınızın e-poçtunu və ya istifadəçi adını yazın, parol sıfırlama linki göndərəcəyik.";
+        if (m === "reset") return "Hesabınız üçün yeni parol seçin.";
+        return "İstifadəçi adınız (və ya e-poçtunuz) və parolunuzla daxil olun.";
+      },
+      authSubmitLabel() {
+        const m = this.auth.mode;
+        return m === "register" ? "Hesab aç" : m === "forgot" ? "Link göndər" : m === "reset" ? "Parolu yenilə" : "Daxil ol";
+      },
+      async submitAuth() {
+        const a = this.auth;
+        if (a.busy) return;
+        const username = a.user.trim();
+        a.info = "";
+        if (a.mode === "forgot") {
+          if (!username) { a.err = "E-poçt və ya istifadəçi adını yazın."; return; }
+        } else if (a.mode === "reset") {
+          if (a.pass.length < 8) { a.err = "Yeni parol ən azı 8 simvol olmalıdır."; return; }
+        } else {
+          if (!username || !a.pass) { a.err = a.mode === "register" ? "İstifadəçi adını və parolu yazın." : "İstifadəçi adı (və ya e-poçt) və parolu yazın."; return; }
+          if (a.mode === "register" && !a.email.trim()) { a.err = "E-poçt ünvanını yazın."; return; }
+          if (a.mode === "register" && !a.invite.trim()) { a.err = "Qeydiyyat kodunu yazın."; return; }
+        }
+        a.busy = true; a.err = "";
+        try {
+          let path, body;
+          if (a.mode === "forgot") { path = "forgot"; body = { login: username }; }
+          else if (a.mode === "reset") { path = "reset"; body = { token: a.resetToken, password: a.pass }; }
+          else if (a.mode === "register") { path = "register"; body = { username, email: a.email.trim(), password: a.pass, invite: a.invite.trim() }; }
+          else { path = "login"; body = { username, password: a.pass }; }
+          const res = await fetch("/api/auth/" + path, {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+          });
+          if (!res.ok) { a.err = await this.errorOf(res); return; }
+          if (a.mode === "forgot") {
+            a.info = "Bu hesab üçün e-poçt varsa, parol sıfırlama linki göndərildi. Spam qovluğuna da baxın.";
+            return;
+          }
+          const data = await res.json();
+          this.token = data.token;
+          try { localStorage.setItem("az_token", data.token); } catch {}
+          a.pass = ""; a.invite = ""; a.resetToken = "";
+          if (a.mode === "reset") a.mode = "login";
+          await this.startSession(data.user);
+        } catch { a.err = "Serverə qoşulmaq olmadı."; }
+        finally { a.busy = false; }
+      },
+      async verifyToken() {
+        try {
+          const res = await this.api("/api/auth/me");
+          if (res.status === 401) { this.clearAuth(); return; }
+          if (!res.ok) return;
+          await this.startSession((await res.json()).user);
+        } catch {}
+      },
+      // giriş uğurlu olandan sonra: istifadəçiyə aid yerli yaddaş açılır, tarixçə serverlə sinxronlaşır
+      async startSession(user) {
+        if (this.me && user && this.me.id !== user.id) this.wipeWork();
+        this.me = user;
+        this.authed = true;
+        idb = makeIdb(user ? "az-ocr-u" + user.id : "az-ocr");
+        await this.loadHist();
+        this.syncHist();
+      },
+      wipeWork() {
+        this.items = []; this.results = []; this.sel = 0; this.picked = [];
+        this.hist = []; this.hpick = []; this.openTable = null;
+      },
+      // e-poçtdakı təsdiq linki
+      async confirmEmail(token) {
+        try {
+          const res = await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
+          if (!res.ok) { const m = await this.errorOf(res); this.auth.err = m; this.toast(m, "err"); return; }
+          this.auth.info = "E-poçt təsdiqləndi.";
+          this.toast("E-poçt təsdiqləndi.", "ok");
+          if (this.me) this.me.verified = true;
+        } catch { this.toast("Serverə qoşulmaq olmadı.", "err"); }
+      },
+      async resendVerify() {
+        if (this.acct.mailBusy) return;
+        this.acct.mailBusy = true;
+        try {
+          const res = await this.api("/api/auth/resend-verification", { method: "POST" });
+          if (!res.ok) { this.toast(await this.errorOf(res), "warn"); return; }
+          if ((await res.json()).verified) { if (this.me) this.me.verified = true; this.toast("E-poçt artıq təsdiqlənib.", "ok"); }
+          else this.toast("Təsdiq linki göndərildi. Spam qovluğuna da baxın.", "ok");
+        } catch (e) { this.toast(this.netMsg(e), "err"); }
+        finally { this.acct.mailBusy = false; }
+      },
+      async changePassword() {
+        const a = this.acct;
+        if (a.busy) return;
+        if (!a.cur || a.next.length < 8) { a.err = "Cari parolu yazın; yeni parol ən azı 8 simvol olmalıdır."; return; }
+        a.busy = true; a.err = "";
+        try {
+          const res = await this.api("/api/auth/change-password", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ current: a.cur, new: a.next }),
+          });
+          if (!res.ok) { a.err = await this.errorOf(res); return; }
+          const data = await res.json();
+          this.token = data.token;   // köhnə nişan artıq keçmir, yenisi yadda saxlanır
+          try { localStorage.setItem("az_token", data.token); } catch {}
+          this.me = data.user;
+          a.cur = ""; a.next = "";
+          this.toast("Parol dəyişdirildi. Digər cihazlarda yenidən daxil olmaq lazım olacaq.", "ok");
+        } catch (e) { a.err = this.netMsg(e); }
+        finally { a.busy = false; }
+      },
+      async deleteAccount() {
+        const a = this.acct;
+        if (a.delBusy) return;
+        if (!a.delPass) { a.delErr = "Təsdiq üçün parolu yazın."; return; }
+        a.delBusy = true; a.delErr = "";
+        try {
+          const res = await this.api("/api/auth/delete-account", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password: a.delPass }),
+          });
+          if (!res.ok) { a.delErr = await this.errorOf(res); return; }
+          try { await idb.clear("hist"); await idb.clear("files"); } catch {}   // bu brauzerdəki yerli nüsxələr də silinir
+          a.delPass = ""; a.delOpen = false;
+          this.logout();
+          this.toast("Hesab silindi.", "ok");
+        } catch (e) { a.delErr = this.netMsg(e); }
+        finally { a.delBusy = false; }
+      },
+      logout() {
+        this.clearAuth(); this.me = null;
+        this.auth.pass = ""; this.auth.invite = ""; this.auth.err = "";
+        this.wipeWork();   // ortaq kompüterdə əvvəlki istifadəçinin nəticələri ekranda qalmasın
+      },
+
+      // ---------- fayllar ----------
+      get toggles() {
+        return [
+          { key: "fix", icon: "sparkles", title: "LLM ilə düzəlt", desc: "OCR səhvlərini (ə, ı, ö, ü...) şəkilə baxaraq düzəldir.", show: true },
+          { key: "tables", icon: "table-2", title: "Cədvəlləri çıxar", desc: "Cədvəlləri aşkarlayır, Excel-ə köçürmək üçün.", show: true },
+          { key: "enhance", icon: "scan-line", title: "Skanı təmizlə", desc: "Kənarları kəs, perspektivi və əyriliyi düzəlt, kölgəni sil.", show: this.cfg.opencv },
+          { key: "merge", icon: "layers", title: "Nəticələri birləşdir", desc: "Bir neçə fayl bir mətndə.", show: true },
+        ].filter((t) => t.show);
+      },
+      get enhanceOn() { return this.cfg.opencv && this.opts.enhance; },
+      get usable() { return this.items.some((i) => PDF_SRC_EXT.test(i.file.name)); },
+      makeUrl(f) { return /\.(pdf|jpe?g|png|bmp|webp|gif)$/i.test(f.name) ? URL.createObjectURL(f) : ""; },
+      kind(it) {
+        if (/\.docx$/i.test(it.file.name)) return "docx";
+        if (!it.url) return "none";
+        if (/\.pdf$/i.test(it.file.name)) return "pdf";
+        return IMG_OK.test(it.file.name) && !it.broken ? "img" : "none";
+      },
+      addFiles(list) {
+        const skipped = [];
+        let added = 0;
+        for (const f of list) {
+          if (this.items.length >= this.cfg.max_files) { skipped.push(`${f.name} (limit ${this.cfg.max_files} fayl)`); continue; }
+          if (f.size > this.cfg.max_mb * 1048576) { skipped.push(`${f.name} (${this.cfg.max_mb} MB-dan böyükdür)`); continue; }
+          this.items.push({ id: this.nextId++, file: f, status: "idle", msg: "", url: this.makeUrl(f), broken: false, method: "", pages: null, conf: null, ri: -1 });
+          added++;
+        }
+        if (skipped.length) this.toast("Əlavə edilmədi: " + skipped.join(", "), "warn");
+        return added;
+      },
+      resetResults() {
+        this.results = []; this.sel = 0; this.picked = []; this.openTable = null;
+        this.items.forEach((i) => { i.status = "idle"; i.msg = ""; i.method = ""; i.pages = null; i.conf = null; i.ri = -1; });
+      },
+      removeItem(id) {
+        const it = this.items.find((i) => i.id === id);
+        if (it && it.url && !this.results.some((r) => (r.srcIds || []).includes(id))) URL.revokeObjectURL(it.url);
+        this.items = this.items.filter((i) => i.id !== id);
+        this.picked = this.picked.filter((x) => x !== id);
+      },
+      clearItems() {
+        this.items.forEach((i) => i.url && URL.revokeObjectURL(i.url));
+        this.items = []; this.resetResults(); this.filter = "all"; this.q = "";
+      },
+      get filteredItems() {
+        const q = this.q.trim().toLowerCase();
+        return this.items.filter((i) => (this.filter === "all" || i.status === this.filter) && (!q || i.file.name.toLowerCase().includes(q)));
+      },
+      count(s) { return s === "all" ? this.items.length : this.items.filter((i) => i.status === s).length; },
+      togglePick(id) { this.picked = this.picked.includes(id) ? this.picked.filter((i) => i !== id) : [...this.picked, id]; },
+      get pickable() { return this.filteredItems; },
+      // Emal ediləcək fayllar: seçilmişlər; seçim yoxdursa hələ emal olunmamışlar; onlar da yoxdursa hamısı
+      get targets() {
+        const pk = this.items.filter((i) => this.picked.includes(i.id));
+        if (pk.length) return pk;
+        const fresh = this.items.filter((i) => i.ri < 0);
+        return fresh.length ? fresh : this.items;
+      },
+      get targetInfo() {
+        if (!this.items.length) return "Əvvəlcə fayl seçin";
+        const n = this.targets.length;
+        if (this.picked.length) return n + " seçilmiş fayl emal olunacaq";
+        return n === this.items.length && this.items.every((i) => i.ri >= 0) ? "Hamısı yenidən oxunacaq" : n + " fayl hazırdır";
+      },
+      get allPicked() { return this.pickable.length > 0 && this.pickable.every((i) => this.picked.includes(i.id)); },
+      pickAll(on) { this.picked = on ? this.pickable.map((i) => i.id) : []; },
+      get canMerge() { return !this.running && new Set(this.items.filter((i) => this.picked.includes(i.id) && i.ri >= 0).map((i) => i.ri)).size >= 2; },
+      // seçilmiş hazır nəticələri müştəri tərəfində bir mətndə birləşdirir
+      mergePicked() {
+        const chosen = this.items.filter((i) => this.picked.includes(i.id) && i.ri >= 0);
+        const idx = [...new Set(chosen.map((i) => i.ri))].sort((a, b) => a - b);
+        const parts = idx.map((i) => this.results[i]).filter((x) => x && !x.data.error);
+        if (parts.length < 2) return;
+        const confs = parts.map((p) => p.data.avg_confidence).filter((c) => c != null);
+        const data = {
+          method: "merged", llm_fixed: parts.some((p) => p.data.llm_fixed),
+          pages: parts.reduce((s, p) => s + (p.data.pages || 0), 0) || null,
+          avg_confidence: confs.length ? confs.reduce((s, c) => s + c, 0) / confs.length : null,
+          tables: parts.flatMap((p) => p.data.tables || []), warnings: [],
+        };
+        const res = this.makeResult({ label: `Birləşdirilmiş · ${parts.length} fayl`, fixed: parts.map((p) => p.fixed).join("\n\n"), raw: parts.map((p) => p.raw).join("\n\n"), data, srcIds: chosen.map((i) => i.id) });
+        this.results.push(res);
+        this.sel = this.results.length - 1; this.tab = "fixed";
+        this.go("result");
+      },
+      makeResult({ label, fixed, raw, data, srcIds = [], hid = null }) {
+        return { label, fixed, raw, data, srcIds, hid, dirty: false, hasRaw: raw !== fixed };
+      },
+      openItem(it) { if (it.ri < 0) return; this.sel = it.ri; this.tab = "fixed"; this.go("result"); },
+
+      // ---------- OCR ----------
+      async run(ids) {
+        if (this.running || !this.items.length) return;
+        const items = Array.isArray(ids) ? this.items.filter((i) => ids.includes(i.id)) : this.targets.slice();
+        if (!items.length) return;
+        this.dropResultsFor(items);
+        items.forEach((i) => { i.status = "run"; i.msg = ""; i.ri = -1; i.method = ""; i.pages = null; i.conf = null; });
+        this.picked = []; this.openTable = null;
+        this.running = true; this.elapsed = 0;
+        const t0 = Date.now();
+        this.timer = setInterval(() => { this.elapsed = Math.round((Date.now() - t0) / 1000); }, 500);
+        this.abortCtl = new AbortController();
+        this.go("workspace");
+
+        const form = new FormData();
+        items.forEach((i) => form.append("files", i.file));
+        const params = new URLSearchParams({
+          fix: String(this.opts.fix), enhance: String(this.enhanceOn),
+          tables: String(this.opts.tables), merge: String(this.opts.merge && items.length > 1),
+        });
+        this.progress = { done: 0, total: items.length }; this.jobId = null;
+        try {
+          // 1) fayllar göndərilir, server dərhal iş nömrəsi qaytarır
+          const submit = async () => {
+            const res = await this.api("/api/jobs?" + params, { method: "POST", body: form, signal: this.abortCtl.signal });
+            if (!res.ok) throw new Error(await this.errorOf(res));
+            this.jobId = (await res.json()).job_id;
+          };
+          await submit();
+          // 2) iş bitənə qədər vəziyyət soruşulur
+          let body, fails = 0, resent = false;
+          for (;;) {
+            await sleep(1000, this.abortCtl.signal);
+            let pr;
+            // server yenidən başlayanda bağlantı bir neçə on saniyə kəsilə bilər: iş bazada qalır və davam edir
+            try { pr = await this.api("/api/jobs/" + this.jobId, { signal: this.abortCtl.signal }); }
+            catch (e) {
+              if (e.name === "AbortError" || ++fails >= 120) throw e;
+              if (fails === 3) this.toast("Server cavab vermir, bağlantı bərpa olunana qədər gözlənilir.", "warn");
+              continue;
+            }
+            if (pr.status === 502 || pr.status === 503 || pr.status === 504) {
+              if (++fails >= 120) throw new Error("Server cavab vermir.");
+              if (fails === 3) this.toast("Server yenidən başlayır, emal davam edəcək.", "warn");
+              continue;
+            }
+            fails = 0;
+            if (pr.status === 404) {
+              // server işi itirib (yenidən başlama/deploy): fayllar brauzerdədir, bir dəfə avtomatik təkrar göndərilir
+              if (resent) throw new Error("Emal tapılmadı (server yenidən başlayıb ola bilər). Yenidən cəhd edin.");
+              resent = true; fails = 0;
+              this.toast("Server yenidən başlayıb, emal təkrar göndərilir.", "warn");
+              items.forEach((i) => { i.status = "run"; i.msg = ""; });
+              this.progress = { done: 0, total: items.length };
+              await submit();
+              continue;
+            }
+            if (!pr.ok) throw new Error(await this.errorOf(pr));
+            const job = await pr.json();
+            this.progress = { done: job.done, total: job.total };
+            job.files.forEach((f, k) => {
+              const it = items[k];
+              if (!it) return;
+              if (f.status === "ok") {
+                it.status = "ok"; it.method = f.method || ""; it.llm = !!f.llm;
+                it.pages = f.pages || null; it.conf = f.confidence == null ? null : f.confidence;
+              } else if (f.status === "err") { it.status = "err"; it.msg = f.error || ""; }
+            });
+            if (job.status === "done") { body = job; break; }
+            if (job.status === "cancelled") throw new DOMException("Aborted", "AbortError");
+            if (job.status === "failed") throw new Error(job.error || "Emal uğursuz oldu.");
+          }
+          const list = body.results || [];
+          if (!list.length) throw new Error("Server boş cavab qaytardı.");
+          const merged = list.length === 1 && items.length > 1;
+          const base = this.results.length;
+          const fresh = list.map((data, i) => this.makeResult({
+            data, label: merged ? data.filename : (items[i] ? items[i].file.name : data.filename),
+            fixed: data.text || "", raw: data.raw_text || data.text || "",
+            srcIds: merged ? items.map((x) => x.id) : (items[i] ? [items[i].id] : []),
+          }));
+          this.results = this.results.concat(fresh);
+          items.forEach((it, i) => {
+            const k = merged ? 0 : i, d = list[k];
+            it.ri = d ? base + k : -1;
+            if (!d || d.error) { it.status = "err"; it.msg = d ? d.error : "Nəticə qaytarılmadı."; return; }
+            it.status = d.llm_error || (d.warnings || []).length ? "warn" : "ok";
+            it.method = d.method || ""; it.llm = !!d.llm_fixed; it.pages = d.pages || null; it.conf = d.avg_confidence == null ? null : d.avg_confidence;
+          });
+          this.pushHist();
+          this.tab = "fixed";
+          const bad = fresh.filter((x) => x.data.error).length;
+          if (bad === fresh.length) this.toast(bad + " fayl işlənmədi. Siyahıdan baxın.", "err");
+          else {
+            if (bad) this.toast(bad + " fayl işlənmədi. Siyahıdan baxın.", "warn");
+            this.sel = base + Math.max(0, fresh.findIndex((x) => !x.data.error));
+            this.go("result");
+          }
+        } catch (err) {
+          if (err.name === "AbortError") { items.forEach((i) => { i.status = "idle"; }); this.toast("Emal ləğv edildi."); }
+          else { const m = this.netMsg(err); items.forEach((i) => { i.status = "err"; i.msg = m; }); this.toast(m, "err"); }
+        } finally {
+          this.running = false; clearInterval(this.timer); this.abortCtl = null; this.jobId = null;
+        }
+      },
+      cancel() {
+        if (this.jobId) this.api("/api/jobs/" + this.jobId, { method: "DELETE" }).catch(() => {});
+        if (this.abortCtl) this.abortCtl.abort();
+      },
+
+      // ---------- nəticə ----------
+      get hasR() { return !!this.results[this.sel]; },
+      get r() { return this.results[this.sel] || EMPTY; },
+      get okResult() { return this.hasR && !this.r.data.error; },
+      get tables() { return (this.r && this.r.data && this.r.data.tables) || []; },
+      get srcItems() { return this.hasR ? (this.r.srcExtra || this.items.filter((i) => this.r.srcIds.includes(i.id))) : []; },
+      get confPct() { const c = this.r.data.avg_confidence; return c == null ? null : Math.round(c * 100); },
+      get warns() {
+        if (!this.hasR) return [];
+        const d = this.r.data, out = [];
+        if (d.llm_error) { console.warn(d.llm_error); out.push({ icon: "sparkles", title: "LLM işləmədi", text: "LLM düzəlişi alınmadı, xam mətn göstərilir." }); }
+        (d.warnings || []).forEach((w) => out.push({ icon: "triangle-alert", title: "Xəbərdarlıq", text: w }));
+        return out;
+      },
+      curText() { const r = this.r; return this.tab === "raw" && r.hasRaw ? r.raw : r.fixed; },
+      get wordCount() { return (this.curText().trim().match(/\S+/g) || []).length; },
+      // cari nəticəni "Nəticə" siyahısından çıxarır (tarixçədəki qeyd silinmir)
+      closeResult() {
+        if (!this.hasR) return;
+        const idx = this.sel, r = this.results[idx];
+        if (r.dirty && !confirm("Saxlanmamış dəyişikliklər var. Yenə də bağlansın?")) return;
+        (r.srcExtra || []).forEach((i) => i.url && URL.revokeObjectURL(i.url));
+        this.results.splice(idx, 1);
+        this.items.forEach((it) => {
+          if (it.ri === idx) { it.ri = -1; it.status = "idle"; it.msg = ""; it.method = ""; it.pages = null; it.conf = null; }
+          else if (it.ri > idx) it.ri--;
+        });
+        this.openTable = null; this.tab = "fixed";
+        this.sel = Math.max(0, Math.min(idx, this.results.length - 1));
+        this.toast(r.hid ? "Nəticə bağlandı, tarixçədə qalır." : "Nəticə bağlandı.");
+        if (!this.results.length) this.go("workspace");
+      },
+      removeResultAt(idx) {
+        const r = this.results[idx];
+        if (!r) return;
+        (r.srcExtra || []).forEach((i) => i.url && URL.revokeObjectURL(i.url));
+        this.results.splice(idx, 1);
+        this.items.forEach((it) => {
+          if (it.ri === idx) { it.ri = -1; it.status = "idle"; it.msg = ""; it.method = ""; it.pages = null; it.conf = null; }
+          else if (it.ri > idx) it.ri--;
+        });
+        if (this.sel > idx) this.sel--;
+        this.sel = Math.max(0, Math.min(this.sel, this.results.length - 1));
+      },
+      // təkrar emal olunacaq fayllara aid köhnə nəticələri silir (digərlərinə toxunmur)
+      dropResultsFor(targets) {
+        const ids = new Set(targets.map((i) => i.id));
+        for (let idx = this.results.length - 1; idx >= 0; idx--) {
+          if ((this.results[idx].srcIds || []).some((id) => ids.has(id))) this.removeResultAt(idx);
+        }
+      },
+      step(d) { const n = this.results.length; if (n) { this.sel = (this.sel + d + n) % n; this.tab = "fixed"; this.openTable = null; } },
+      diffOf() {
+        const r = this.r;
+        const tok = (s) => { const o = [], re = /(\S+)(\s*)/g; let m; while ((m = re.exec(s))) o.push({ w: m[1], s: m[2] }); return o; };
+        const A = tok(r.raw), B = tok(r.fixed), n = A.length, m = B.length;
+        const lead = (s) => (s.match(/^\s*/) || [""])[0];
+        const plain = (T, s) => esc(lead(s)) + T.map((t) => esc(t.w + t.s)).join("");
+        if (n * m > 8e6) return { a: esc(r.raw), b: esc(r.fixed), skipped: true, add: 0, del: 0 };
+        const w = m + 1, dp = new Uint32Array((n + 1) * w);
+        for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+          dp[i * w + j] = A[i].w === B[j].w ? dp[(i + 1) * w + j + 1] + 1 : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+        const da = new Uint8Array(n), db = new Uint8Array(m);
+        let i = 0, j = 0;
+        while (i < n && j < m) {
+          if (A[i].w === B[j].w) { i++; j++; }
+          else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) da[i++] = 1;
+          else db[j++] = 1;
+        }
+        while (i < n) da[i++] = 1;
+        while (j < m) db[j++] = 1;
+        const render = (T, flags, cls, s) => esc(lead(s)) + T.map((t, k) => (flags[k] ? `<mark class="${cls}">${esc(t.w)}</mark>` : esc(t.w)) + esc(t.s)).join("");
+        return { a: render(A, da, "del", r.raw), b: render(B, db, "add", r.fixed), skipped: false, del: da.reduce((s, x) => s + x, 0), add: db.reduce((s, x) => s + x, 0) };
+      },
+      async copyCur() { await this.copy(this.curText()); },
+      dlTxt() { this.saveBlob(new Blob([this.curText()], { type: "text/plain;charset=utf-8" }), this.fileStem(this.r.label) + ".txt"); },
+
+      // ---------- yükləmələr ----------
+      async postExport(path, payload, name, label) {
+        this.toast(label + " hazırlanır...");
+        try {
+          const res = await this.api(path, { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "application/json" } });
+          if (!res.ok) throw new Error(await this.errorOf(res));
+          this.saveBlob(await res.blob(), name);
+          this.toast(label + " yükləndi", "ok");
+        } catch (err) { this.toast(this.netMsg(err), "err"); }
+      },
+      exportDocx(text, stem) {
+        const t = text != null ? text : this.curText();
+        if (!t) return this.toast("Mətn boşdur.", "warn");
+        return this.postExport("/api/export/docx", { text: t }, (stem || this.fileStem(this.r.label)) + ".docx", ".docx");
+      },
+      exportXlsx(tables, stem) {
+        if (!tables || !tables.length) return;
+        return this.postExport("/api/export/xlsx", { tables }, (stem || this.fileStem(this.r.label) + "-cedveller") + ".xlsx", ".xlsx");
+      },
+      async dlPdf() {
+        const base = this.picked.length ? this.items.filter((i) => this.picked.includes(i.id)) : this.items;
+        const files = base.filter((i) => PDF_SRC_EXT.test(i.file.name));
+        if (!files.length) return;
+        if (files.some((i) => /\.docx$/i.test(i.file.name)) && !this.cfg.docx_pdf) {
+          this.toast("DOCX-dən axtarışlı PDF üçün serverdə LibreOffice lazımdır. Lokal işlədirsinizsə libreoffice.org-dan quraşdırıb serveri yenidən başladın.", "err");
+          return;
+        }
+        this.toast("Axtarışlı PDF hazırlanır...");
+        const form = new FormData();
+        files.forEach((i) => form.append("files", i.file));
+        try {
+          const res = await this.api("/api/searchable-pdf?enhance=" + this.enhanceOn, { method: "POST", body: form });
+          if (!res.ok) throw new Error(await this.errorOf(res));
+          const font = res.headers.get("X-Warning") === "font";
+          this.saveBlob(await res.blob(), "axtarisli.pdf");
+          this.toast(font ? "PDF yükləndi. Unicode şrift tapılmadı, ə hərfi axtarışda düzgün olmaya bilər." : "Axtarışlı PDF yükləndi", font ? "warn" : "ok");
+        } catch (err) { this.toast(this.netMsg(err), "err"); }
+      },
+
+      // ---------- kamera ----------
+      async openCam() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { this.$refs.camInput.click(); return; }
+        try {
+          this.cam.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 2560 }, height: { ideal: 1440 } }, audio: false });
+          this.cam.open = true;
+          await this.$nextTick();
+          this.$refs.video.srcObject = this.cam.stream;
+        } catch {
+          this.toast("Kameraya icazə verilmədi və ya kamera tapılmadı.", "warn");
+          this.$refs.camInput.click();
+        }
+      },
+      closeCam() {
+        if (this.cam.stream) this.cam.stream.getTracks().forEach((t) => t.stop());
+        this.cam.stream = null; this.cam.open = false; this.cam.shots = 0;
+        if (this.$refs.video) this.$refs.video.srcObject = null;
+      },
+      takeShot() {
+        const v = this.$refs.video, vw = v.videoWidth, vh = v.videoHeight;
+        if (!vw || !vh) return;
+        const scale = Math.min(1, 2400 / Math.max(vw, vh));
+        const c = document.createElement("canvas");
+        c.width = Math.round(vw * scale); c.height = Math.round(vh * scale);
+        c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+        c.toBlob((blob) => {
+          if (!blob) return this.toast("Şəkil çəkilmədi, yenidən cəhd edin.", "err");
+          this.cam.shots++;
+          this.addFiles([new File([blob], "skan-" + String(this.cam.shots).padStart(2, "0") + "-" + Date.now() + ".jpg", { type: "image/jpeg" })]);
+        }, "image/jpeg", 0.92);
+      },
+      camDone() {
+        const n = this.cam.shots;
+        this.closeCam();
+        if (n > 1) this.opts.merge = true; // çox səhifəli skan: bir mətndə birləşdir
+        if (n) this.run();
+      },
+      onCamInput(el) {
+        const f = el.files[0]; el.value = "";
+        if (!f) return;
+        const wasEmpty = !this.items.length;
+        this.addFiles([f]);
+        if (wasEmpty) this.run(); // yalnız ilk skanda avtomatik başla
+      },
+
+      // ---------- sürüklə və yapışdır ----------
+      hasFiles(e) { return e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files"); },
+      dragIn(e) { if (this.hasFiles(e)) this.dragDepth++; },
+      dragOut(e) { if (this.hasFiles(e)) this.dragDepth = Math.max(0, this.dragDepth - 1); },
+      dropFiles(e) {
+        this.dragDepth = 0;
+        if (!this.hasFiles(e) || !e.dataTransfer.files.length || this.running) return;
+        this.addFiles([...e.dataTransfer.files]);
+        this.go("workspace");
+      },
+      onPaste(e) {
+        const files = e.clipboardData && e.clipboardData.files;
+        if (!files || !files.length || this.running) return;
+        const named = [...files].map((f, i) => (f.name && f.name !== "image.png" ? f : new File([f], "yapisdirilmis-" + Date.now() + "-" + i + "." + (f.type.split("/")[1] || "png"), { type: f.type })));
+        if (this.addFiles(named)) { this.go("workspace"); this.toast("Panodan əlavə edildi.", "ok"); }
+      },
+
+      // ---------- tarixçə (yalnız bu brauzerdə) ----------
+      async loadHist() {
+        try {
+          let list = await idb.all("hist");
+          // hesablardan əvvəlki yerli tarixçəni bu brauzerdə ilk daxil olan hesab bir dəfə devralır
+          try {
+            if (this.me && !localStorage.getItem("az_legacy_claimed")) {
+              const legacy = makeIdb("az-ocr");
+              for (const h of await legacy.all("hist")) {
+                if (list.some((x) => x.id === h.id)) continue;
+                await idb.put("hist", h);
+                const f = await legacy.get("files", h.id);
+                if (f) await idb.put("files", f);
+                list.push(h);
+              }
+              localStorage.setItem("az_legacy_claimed", "1");
+            }
+          } catch {}
+          // köhnə (yalnız mətn) localStorage qeydlərini köçür
+          try {
+            const old = JSON.parse(localStorage.getItem(HKEY) || "[]");
+            for (const h of old) {
+              const rec = { ...h, tables: [], warnings: [], hasFiles: false, filesSize: 0, size: (h.fixed || "").length + (h.raw || "").length };
+              if (!list.some((x) => x.id === rec.id)) { await idb.put("hist", rec); list.push(rec); }
+            }
+            if (old.length) localStorage.removeItem(HKEY);
+          } catch {}
+          this.hist = list.sort((a, b) => b.ts - a.ts);
+          if (navigator.storage && navigator.storage.persisted) navigator.storage.persisted().then((p) => { this.persisted = p; }).catch(() => {});
+        } catch { this.hist = []; this.toast("Brauzer yaddaşına çıxış yoxdur, tarixçə saxlanılmayacaq.", "warn"); }
+      },
+      // brauzerdən tarixçənin avtomatik silinməməsini xahiş edir (hər açılışda bir dəfə, ilk uğurlu saxlamadan sonra)
+      async askPersist() {
+        if (this.persisted || this.persistAsked || !navigator.storage || !navigator.storage.persist) return;
+        this.persistAsked = true;
+        try { this.persisted = await navigator.storage.persist(); } catch {}
+      },
+      get histUsed() { return this.hist.reduce((s, h) => s + (h.size || 0), 0); },
+      srcFilesOf(srcIds) {
+        const files = this.items.filter((i) => srcIds.includes(i.id)).map((i) => ({ name: i.file.name, type: i.file.type, blob: i.file }));
+        const size = files.reduce((s, f) => s + f.blob.size, 0);
+        return size <= HFILES_MAX ? { files, size } : { files: [], size: 0 };
+      },
+      async pushHist() {
+        const add = [];
+        this.results.forEach((r, i) => {
+          if (r.data.error || r.hid) return;
+          r.hid = Date.now() + i;
+          const src = this.srcFilesOf(r.srcIds);
+          add.push({ rec: this.histEntry(r, src.size), files: src.files });
+        });
+        if (!add.length) return;
+        const saved = [];
+        try {
+          for (const { rec, files } of add) saved.push(await this.storeRec(rec, files));
+        } catch (e) { this.toast(this.histErr(e), "warn"); }
+        if (!saved.length) return;
+        this.hist = saved.concat(this.hist).sort((a, b) => b.ts - a.ts);
+        saved.forEach((r) => this.pushRemote(r));
+        await this.pruneHist();
+        this.askPersist();
+      },
+      // Qeydi yazır. Yaddaş doludursa: 1) mənbə fayllar olmadan, 2) ən köhnə qeydləri silib yenidən cəhd edir.
+      async storeRec(rec, files) {
+        const attempt = async (withFiles) => {
+          const r = withFiles ? rec : { ...rec, hasFiles: false, filesSize: 0, size: rec.size - (rec.filesSize || 0) };
+          try {
+            await idb.put("hist", r);
+            if (withFiles && files.length) await idb.put("files", { id: r.id, files });
+            return r;
+          } catch (e) {
+            try { await idb.del("hist", r.id); await idb.del("files", r.id); } catch {}   // yarımçıq qeydi təmizlə
+            throw e;
+          }
+        };
+        let withFiles = files.length > 0;
+        if (withFiles && navigator.storage && navigator.storage.estimate) {
+          try {
+            const { quota, usage } = await navigator.storage.estimate();
+            if (quota && quota - usage < (rec.filesSize || 0) * 2 + 5 * 1048576) withFiles = false;
+          } catch {}
+        }
+        try { return await attempt(withFiles); }
+        catch (e1) {
+          if (withFiles) {
+            try {
+              const r = await attempt(false);
+              this.toast("Brauzer yaddaşı kifayət etmədi, mənbə fayl olmadan yalnız mətn saxlanıldı.", "warn");
+              return r;
+            } catch {}
+          }
+          await this.evictOldest(5);
+          const r = await attempt(false);
+          this.toast("Yaddaş dolu idi, ən köhnə qeydlər silindi və mətn saxlanıldı.", "warn");
+          return r;
+        }
+      },
+      async evictOldest(n) {
+        const old = [...this.hist].sort((a, b) => a.ts - b.ts).slice(0, n);
+        for (const h of old) { try { await idb.del("hist", h.id); await idb.del("files", h.id); } catch {} }
+        this.hist = this.hist.filter((h) => !old.some((o) => o.id === h.id));
+      },
+      // limiti aşan ən köhnə qeydləri silir
+      async pruneHist() {
+        let total = 0, full = false;
+        const keep = [], drop = [];
+        for (const h of this.hist) {
+          total += h.size || 0;
+          if (!full && keep.length < HMAX && total <= QUOTA) keep.push(h); else { full = true; drop.push(h); }
+        }
+        if (!drop.length) return;
+        try { for (const h of drop) { await idb.del("hist", h.id); await idb.del("files", h.id); } } catch {}
+        this.hist = keep;
+      },
+      // Alpine reaktiv (Proxy) obyektləri IndexedDB-yə yazıla bilmir, ona görə adi kopya götürülür
+      plain(v) { return JSON.parse(JSON.stringify(v)); },
+      histErr(e) {
+        console.error("Tarixçə xətası:", e);
+        return e && e.name === "QuotaExceededError"
+          ? "Brauzer yaddaşı doludur, tarixçə saxlanılmadı."
+          : "Tarixçə saxlanılmadı (" + ((e && e.name) || "naməlum xəta") + ").";
+      },
+      histEntry(r, filesSize = 0) {
+        const tables = this.plain(r.data.tables || []);
+        return {
+          id: r.hid, ts: Date.now(), label: r.label, fixed: r.fixed, raw: r.raw,
+          method: r.data.method || "", pages: r.data.pages || null,
+          conf: r.data.avg_confidence == null ? null : r.data.avg_confidence, llm: !!r.data.llm_fixed,
+          tables, warnings: this.plain(r.data.warnings || []), llmError: r.data.llm_error || null,
+          hasFiles: filesSize > 0, filesSize,
+          size: r.fixed.length + r.raw.length + JSON.stringify(tables).length + filesSize,
+        };
+      },
+      async saveCur() {
+        const r = this.r;
+        if (!this.hasR || r.data.error) return;
+        try {
+          const old = r.hid && this.hist.find((h) => h.id === r.hid);
+          if (old) {
+            const rec = { ...this.histEntry(r, old.filesSize || 0), ts: old.ts };
+            try { await idb.put("hist", rec); }
+            catch (e) { await this.evictOldest(5); await idb.put("hist", rec); }
+            this.hist = this.hist.map((h) => (h.id === old.id ? rec : h));
+            this.pushRemote(rec);
+          } else {
+            r.hid = Date.now();
+            const src = this.srcFilesOf(r.srcIds);
+            const rec = await this.storeRec(this.histEntry(r, src.size), src.files);
+            this.hist = [rec].concat(this.hist);
+            this.pushRemote(rec);
+            await this.pruneHist();
+          }
+        } catch (e) { this.toast(this.histErr(e), "warn"); return; }
+        r.dirty = false;
+        this.toast("Tarixçədə saxlanıldı.", "ok");
+      },
+      get filteredHist() {
+        const q = this.hq.trim().toLowerCase();
+        return this.hist.filter((h) => !q || h.label.toLowerCase().includes(q) || (h.fixed || "").toLowerCase().includes(q));
+      },
+      // tarixçədən açılan nəticə cari nəticələrə əlavə olunur, mövcud iş itmir
+      async openHist(h) {
+        const at = this.results.findIndex((r) => r.hid === h.id);
+        if (at >= 0) this.sel = at;
+        else {
+          let srcExtra = null;
+          if (h.hasFiles) {
+            try {
+              const rec = await idb.get("files", h.id);
+              if (rec && rec.files.length) {
+                srcExtra = rec.files.map((f, k) => {
+                  const file = new File([f.blob], f.name, { type: f.type });
+                  return { id: `h${h.id}-${k}`, file, url: this.makeUrl(file), broken: false };
+                });
+              }
+            } catch {}
+          }
+          const res = this.makeResult({
+            label: h.label, fixed: h.fixed, raw: h.raw, hid: h.id,
+            data: { method: h.method, pages: h.pages, avg_confidence: h.conf, llm_fixed: h.llm, llm_error: h.llmError || null,
+                    tables: h.tables || [], warnings: h.warnings || [], text: h.fixed, raw_text: h.raw },
+          });
+          res.srcExtra = srcExtra;
+          this.results.push(res);
+          this.sel = this.results.length - 1;
+        }
+        this.tab = "fixed"; this.openTable = null;
+        this.go("result");
+      },
+      // DOCX-i brauzerdə səhifə-səhifə göstərir (docx-preview kitabxanası)
+      docxRender(el, file) {
+        if (!window.docx || !window.docx.renderAsync) { el.textContent = "Ön baxış kitabxanası yüklənmədi (internet bağlantısını yoxlayın)."; return; }
+        window.docx.renderAsync(file, el, null, { inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true })
+          .catch(() => { el.textContent = "Bu DOCX faylının ön baxışı göstərilə bilmədi."; });
+      },
+      blobToB64(blob) {
+        return new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(String(r.result).split(",")[1] || "");
+          r.onerror = () => rej(r.error);
+          r.readAsDataURL(blob);
+        });
+      },
+      // seçilmişləri (seçim yoxdursa hamısını) bir .json faylına yazır; mənbə fayllar base64 ilə daxildir
+      async exportHist() {
+        const pick = this.hpick.length ? new Set(this.hpick) : null;
+        const list = this.hist.filter((h) => !pick || pick.has(h.id));
+        if (!list.length || this.histBusy) return;
+        this.histBusy = true;
+        try {
+          const parts = ['{"app":"az-ocr-history","version":1,"exported":' + JSON.stringify(new Date().toISOString()) + ',"items":['];
+          for (const [k, h] of list.entries()) {
+            const item = { ...h, files: [] };
+            if (h.hasFiles) {
+              const rec = await idb.get("files", h.id);
+              for (const f of (rec ? rec.files : [])) item.files.push({ name: f.name, type: f.type, data: await this.blobToB64(f.blob) });
+            }
+            parts.push((k ? "," : "") + JSON.stringify(item));
+          }
+          parts.push("]}");
+          this.saveBlob(new Blob(parts, { type: "application/json" }), `az-ocr-tarixce-${new Date().toISOString().slice(0, 10)}.json`);
+          this.toast(list.length + " qeyd ixrac edildi.", "ok");
+        } catch { this.toast("İxrac alınmadı.", "err"); }
+        finally { this.histBusy = false; }
+      },
+      // ixrac faylını oxuyur; eyni nömrəli qeydlər təkrar əlavə olunmur
+      async importHist(file) {
+        if (!file || this.histBusy) return;
+        this.histBusy = true;
+        try {
+          const data = JSON.parse(await file.text());
+          if (!data || data.app !== "az-ocr-history" || !Array.isArray(data.items)) throw new Error("format");
+          const str = (v, d = "") => (v == null ? d : String(v));
+          let added = 0, skipped = 0;
+          for (const it of data.items) {
+            let id = Number(it && it.id);
+            if (!it || typeof it !== "object" || !Number.isFinite(id) || this.hist.some((h) => h.id === id)) { skipped++; continue; }
+            const fixed = str(it.fixed), raw = str(it.raw, fixed);
+            const files = [];
+            for (const f of Array.isArray(it.files) ? it.files : []) {
+              if (!f || typeof f.data !== "string") continue;
+              const type = str(f.type, "application/octet-stream");
+              files.push({ name: str(f.name, "fayl"), type, blob: await (await fetch(`data:${type};base64,${f.data}`)).blob() });
+            }
+            const filesSize = files.reduce((n, f) => n + f.blob.size, 0);
+            const tables = (Array.isArray(it.tables) ? it.tables : []).map((t) => (Array.isArray(t) ? t.map((r) => (Array.isArray(r) ? r.map((c) => str(c)) : [])) : []));
+            const rec = {
+              id, ts: Number(it.ts) || Date.now(), label: str(it.label, "Adsız"), fixed, raw,
+              method: str(it.method), pages: it.pages == null ? null : Number(it.pages) || null,
+              conf: it.conf == null ? null : Number(it.conf), llm: !!it.llm,
+              tables, warnings: (Array.isArray(it.warnings) ? it.warnings : []).map((w) => str(w)), llmError: it.llmError ? str(it.llmError) : null,
+              hasFiles: filesSize > 0, filesSize, size: fixed.length + raw.length + JSON.stringify(tables).length + filesSize,
+            };
+            await idb.put("hist", rec);
+            if (files.length) await idb.put("files", { id, files });
+            this.hist.push(rec); added++;
+          }
+          this.hist = this.hist.slice().sort((a, b) => b.ts - a.ts);
+          const before = this.hist.length;
+          await this.pruneHist();
+          const dropped = before - this.hist.length;
+          this.toast(`${added} qeyd idxal edildi` + (skipped ? `, ${skipped} qeyd keçildi (təkrar və ya yanlış)` : "") + (dropped ? `, limit aşıldığı üçün ${dropped} köhnə qeyd silindi` : "") + ".", added ? "ok" : "warn");
+          if (added) { this.askPersist(); this.syncHist(); }
+        } catch { this.toast("Bu fayl tarixçə ixracı deyil və ya zədəlidir.", "err"); }
+        finally { this.histBusy = false; }
+      },
+      async dropHist(ids, opts = {}) {
+        const set = new Set(ids);
+        try { for (const id of set) { await idb.del("hist", id); await idb.del("files", id); } } catch {}
+        this.hist = this.hist.filter((h) => !set.has(h.id));
+        this.hpick = this.hpick.filter((i) => !set.has(i));
+        if (opts.remote !== false) set.forEach((id) => this.delRemote(id));
+      },
+      delHist(id) { return this.dropHist([id]); },
+      delPicked() { return this.dropHist(this.hpick.slice()); },
+      async clearHist() {
+        try { await idb.clear("hist"); await idb.clear("files"); } catch {}
+        this.hist = []; this.hpick = []; this.confirmClear = false; this.toast("Tarixçə təmizləndi.");
+        this.clearRemote();
+      },
+
+      // ---------- tarixçə: cihazlar arası sinxronizasiya (yalnız hesab rejimində) ----------
+      get canSync() { return this.cfg.auth_required && this.authed; },
+      async pushRemote(h) {
+        if (!this.canSync) return;
+        try {
+          const body = {
+            ts: h.ts, label: h.label, fixed: h.fixed || "", raw: h.raw || "", method: h.method || "", pages: h.pages == null ? null : h.pages,
+            conf: h.conf == null ? null : h.conf, llm: !!h.llm, tables: this.plain(h.tables || []), warnings: this.plain(h.warnings || []), llmError: h.llmError || null,
+          };
+          const res = await this.api("/api/history/" + h.id, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+          if (!res.ok) return;
+          const live = this.hist.find((x) => x.id === h.id) || h;
+          live.sy = 1;
+          await idb.put("hist", this.plain(live));
+        } catch {}
+      },
+      delRemote(id) {
+        if (!this.canSync) return;
+        this.api("/api/history/" + id, { method: "DELETE" }).catch(() => {});
+      },
+      clearRemote() {
+        if (!this.canSync) return;
+        this.api("/api/history", { method: "DELETE" }).catch(() => {});
+      },
+      // Server siyahısını yerli siyahı ilə birləşdirir: yeniləri gətirir, başqa cihazda silinənləri silir, yerlidə qalanları göndərir
+      async syncHist() {
+        if (!this.canSync || this.syncing || Date.now() - this.lastSync < 5000) return;
+        this.syncing = true;
+        try {
+          const res = await this.api("/api/history");
+          if (!res.ok) return;
+          const remote = (await res.json()).items || [];
+          const rids = new Set(remote.map((r) => r.id));
+          for (const r of remote) {
+            if (this.hist.some((h) => h.id === r.id)) continue;
+            const rec = { ...r, hasFiles: false, filesSize: 0, sy: 1 };
+            rec.size = (rec.fixed || "").length + (rec.raw || "").length + JSON.stringify(rec.tables || []).length;
+            await idb.put("hist", this.plain(rec));
+            this.hist.push(rec);
+          }
+          const gone = this.hist.filter((h) => h.sy && !rids.has(h.id)).map((h) => h.id);
+          if (gone.length) await this.dropHist(gone, { remote: false });
+          for (const h of this.hist.filter((x) => !x.sy)) await this.pushRemote(h);
+          this.hist = this.hist.slice().sort((a, b) => b.ts - a.ts);
+          this.lastSync = Date.now();
+        } catch (e) { console.warn("Sinxronizasiya alınmadı:", e); }
+        finally { this.syncing = false; }
+      },
+
+      // ---------- API səhifəsi ----------
+      get endpoints() {
+        const b = location.origin;
+        const h = this.cfg.auth_required ? ' \\\n  -H "Authorization: Bearer NISAN"' : "";
+        const login = this.cfg.auth_required ? [{
+          m: "POST", p: "/api/auth/login", d: "İstifadəçi adı və parol ilə daxil olur, 30 gün etibarlı nişan qaytarır. Nişan sonrakı sorğularda Authorization: Bearer başlığında göndərilir.",
+          params: [["username", "JSON gövdəsində istifadəçi adı"], ["password", "JSON gövdəsində parol"]],
+          curl: `curl -X POST ${b}/api/auth/login \\\n  -H "Content-Type: application/json" \\\n  -d '{"username":"ad","password":"parol"}'`,
+        }] : [];
+        return [
+          ...login,
+          { m: "GET", p: "/api/config", d: "Hesab tələbi, limitlər, OpenCV və DOCX-dən PDF mövcudluğu.", params: [], curl: `curl ${b}/api/config` },
+          { m: "POST", p: "/api/ocr", d: "Bir neçə faylı oxuyur, hər fayl üçün mətn, metod, səhifə sayı və cədvəllər qaytarır.",
+            params: [["files", "fayllar (çoxlu)"], ["fix", "LLM ilə düzəliş: true/false"], ["enhance", "skan təmizləmə: true/false"], ["tables", "cədvəlləri çıxar: true/false"], ["merge", "nəticələri birləşdir: true/false"]],
+            curl: `curl -X POST "${b}/api/ocr?fix=true&tables=false"${h} \\\n  -F "files=@skan.jpg"` },
+          { m: "POST", p: "/api/jobs", d: "Faylları qəbul edib dərhal job_id qaytarır, emal arxa planda gedir. Parametrlər /api/ocr ilə eynidir.",
+            params: [["files", "fayllar (çoxlu)"], ["fix", "LLM ilə düzəliş: true/false"], ["enhance", "skan təmizləmə: true/false"], ["tables", "cədvəlləri çıxar: true/false"], ["merge", "nəticələri birləşdir: true/false"]],
+            curl: `curl -X POST "${b}/api/jobs?fix=true"${h} \\\n  -F "files=@skan.jpg"` },
+          { m: "GET", p: "/api/jobs/{job_id}", d: "İşin vəziyyəti (queued, running, done, cancelled), hər fayl üzrə irəliləyiş və iş bitəndə nəticələr. DELETE eyni ünvanda işi ləğv edir.", params: [],
+            curl: `curl ${b}/api/jobs/JOB_ID${h}` },
+          { m: "POST", p: "/api/searchable-pdf", d: "Skanın üstünə görünməz mətn qatı əlavə edib axtarışlı PDF qaytarır. DOCX faylı LibreOffice ilə PDF-ə çevrilir.",
+            params: [["files", "fayllar (çoxlu)"], ["enhance", "skan təmizləmə: true/false"]],
+            curl: `curl -X POST "${b}/api/searchable-pdf?enhance=false"${h} \\\n  -F "files=@skan.pdf" -o axtarisli.pdf` },
+          { m: "POST", p: "/api/export/docx", d: "Mətni .docx faylına çevirir.", params: [["text", "JSON gövdəsində mətn"]],
+            curl: `curl -X POST ${b}/api/export/docx${h} \\\n  -H "Content-Type: application/json" \\\n  -d '{"text":"Salam\\n\\nDünya"}' -o netice.docx` },
+          { m: "POST", p: "/api/export/xlsx", d: "Cədvəlləri .xlsx faylına yazır, hər cədvəl ayrı vərəqdə.", params: [["tables", "JSON gövdəsində cədvəllər: [[[xana, ...], ...], ...]"]],
+            curl: `curl -X POST ${b}/api/export/xlsx${h} \\\n  -H "Content-Type: application/json" \\\n  -d '{"tables":[[["A","B"],["1","2"]]]}' -o cedveller.xlsx` },
+        ];
+      },
+    };
+  }
+</script>
+</body>
+</html>
