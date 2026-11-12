@@ -116,8 +116,7 @@ client = DocumentIntelligenceClient(
     endpoint=ENDPOINT,
     credential=AzureKeyCredential(KEY),
 )
-llm = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
-
+llm = genai.Client(api_key=GEMINI_API_KEY, http_options=types.HttpOptions(api_version="v1beta")) if GEMINI_API_KEY else None
 # ---------------------------------------------------------------- Formatlar
 PDF_EXT = {".pdf"}
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp", ".gif", ".heic", ".heif"}
