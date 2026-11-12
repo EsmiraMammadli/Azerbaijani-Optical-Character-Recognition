@@ -17,3 +17,4 @@ jiwer
 sqlalchemy
 psycopg[binary]
 sentry-sdk[fastapi]
+redis

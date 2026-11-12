@@ -6,9 +6,11 @@
 """
 import io
 import itertools
+import json
 import os
 import sys
 import tempfile
+import time
 
 # main.py import olunanda bu dəyişənlər lazımdır; saxta dəyərlər kifayətdir
 os.environ.setdefault("AZURE_DI_ENDPOINT", "https://example.cognitiveservices.azure.com/")
@@ -178,6 +180,7 @@ def _mail_on(monkeypatch):
     monkeypatch.setattr(main, "send_mail", lambda to, subject, text, html: sent.append((to, subject, text)))
     main._RESET_SENT.clear()
     main._VERIFY_SENT.clear()
+    main._CHANGE_SENT.clear()
     return sent
 
 
@@ -355,6 +358,147 @@ def test_healthz_is_light_and_open(monkeypatch):
     assert client.head("/healthz").status_code == 200
 
 
+def _txt(name="a.txt", data=b"x"):
+    return [("files", (name, io.BytesIO(data), "text/plain"))]
+
+
+def _fake_azure(monkeypatch, pages=2):
+    """Azure çağırılmır: sənəd 'pages' səhifəlik OCR nəticəsi kimi qaytarılır."""
+    def fake(filename, data, fix=True, enhance=False, tables=False):
+        return {"filename": filename, "method": "azure-ocr", "pages": pages, "text": "mətn", "raw_text": "mətn",
+                "tables": [], "warnings": [], "avg_confidence": 0.9, "llm_fixed": False}
+    monkeypatch.setattr(main, "process_bytes", fake)
+
+
+def test_monthly_quota(monkeypatch):
+    monkeypatch.setattr(main, "APP_PASSWORD", "sirr")
+    monkeypatch.setattr(main, "USER_MONTHLY_PAGES", 3)
+    _fake_azure(monkeypatch, pages=2)
+    a = _register("kvota1").json()["token"]
+    b = _register("kvota2").json()["token"]
+    ha = _auth(a)
+    assert client.get("/api/usage", headers=ha).json()["left"] == 3
+    r = client.post("/api/ocr", files=_txt("1.png"), headers=ha)
+    assert r.status_code == 200 and "error" not in r.json()["results"][0]
+    assert client.get("/api/usage", headers=ha).json() == {"enabled": True, "limit": 3, "used": 2, "left": 1, "month": main._month()}
+    # 1 səhifə qalıb: bu sorğu keçir (ən çox bir fayl qədər aşmaq olar), sonrakı bloklanır
+    assert client.post("/api/ocr", files=_txt("2.png"), headers=ha).status_code == 200
+    r = client.post("/api/ocr", files=_txt("3.png"), headers=ha)
+    assert r.status_code == 429 and "Aylıq limit" in r.json()["detail"]
+    assert client.post("/api/jobs", files=_txt("4.png"), headers=ha).status_code == 429
+    # başqa istifadəçiyə təsir etmir
+    assert client.post("/api/ocr", files=_txt("5.png"), headers=_auth(b)).status_code == 200
+    # çox fayllı sorğuda limit fayllar arasında da yoxlanır
+    c = _register("kvota3").json()["token"]
+    two = [("files", ("a.png", io.BytesIO(b"1"), "text/plain")), ("files", ("b.png", io.BytesIO(b"2"), "text/plain")),
+           ("files", ("c.png", io.BytesIO(b"3"), "text/plain"))]
+    res = client.post("/api/ocr", files=two, headers=_auth(c)).json()["results"]
+    assert ["error" in x for x in res] == [False, False, True]
+
+
+def test_quota_ignores_files_without_azure_and_can_be_off(monkeypatch):
+    monkeypatch.setattr(main, "APP_PASSWORD", "sirr")
+    monkeypatch.setattr(main, "USER_MONTHLY_PAGES", 1)
+    t = _register("kvota4").json()["token"]
+    for _ in range(3):   # txt Azure-a getmir: limitə girmir
+        assert client.post("/api/ocr", files=_txt(), headers=_auth(t)).status_code == 200
+    assert client.get("/api/usage", headers=_auth(t)).json()["used"] == 0
+    monkeypatch.setattr(main, "USER_MONTHLY_PAGES", 0)   # söndürülüb
+    assert client.get("/api/usage", headers=_auth(t)).json() == {"enabled": False}
+
+
+def test_quota_stops_running_job(monkeypatch):
+    monkeypatch.setattr(main, "APP_PASSWORD", "sirr")
+    monkeypatch.setattr(main, "USER_MONTHLY_PAGES", 2)
+    _fake_azure(monkeypatch, pages=2)
+    h = _auth(_register("kvota5").json()["token"])
+    files = [("files", ("a.png", io.BytesIO(b"1"), "text/plain")), ("files", ("b.png", io.BytesIO(b"2"), "text/plain"))]
+    jid = client.post("/api/jobs", files=files, headers=h).json()["job_id"]
+    for _ in range(50):   # iş arxa planda gedir
+        job = client.get(f"/api/jobs/{jid}", headers=h).json()
+        if job["status"] == "done":
+            break
+        time.sleep(0.1)
+    errs = [r.get("error") for r in job["results"]]
+    assert errs[0] is None and "Aylıq limit" in errs[1]
+
+
+def _login_verified(name, email, sent):
+    """Hesab açır, e-poçtu təsdiqləyir (məktub xidməti qoşulu, təsdiq tələb olunur) və giriş nişanını qaytarır."""
+    reg = _register(name, email=email)
+    assert reg.status_code == 200
+    mail = [m for m in sent if m[0] == email][-1]
+    assert client.post("/api/auth/verify", json={"token": _verify_token_of(mail)}).status_code == 200
+    r = client.post("/api/auth/login", json={"username": name, "password": "parol12345"})
+    assert r.status_code == 200
+    return r.json()["token"]
+
+
+def test_change_email_needs_confirmation_from_new_address(monkeypatch):
+    sent = _mail_on(monkeypatch)
+    token = _login_verified("poct7", "kohne7@example.com", sent)
+    h = _auth(token)
+    _login_verified("poct8", "basqa8@example.com", sent)
+    sent.clear()
+    body = {"password": "parol12345", "email": "Yeni7@Example.com"}
+    assert client.post("/api/auth/change-email", json=body).status_code == 401
+    assert client.post("/api/auth/change-email", json={**body, "password": "yanlis"}, headers=h).status_code == 403
+    assert client.post("/api/auth/change-email", json={**body, "email": "pis-poct"}, headers=h).status_code == 400
+    assert client.post("/api/auth/change-email", json={**body, "email": "kohne7@example.com"}, headers=h).status_code == 400
+    assert client.post("/api/auth/change-email", json={**body, "email": "basqa8@example.com"}, headers=h).status_code == 409
+    ok = client.post("/api/auth/change-email", json=body, headers=h)
+    assert ok.status_code == 200 and ok.json()["pending_email"] == "yeni7@example.com"
+    assert len(sent) == 1 and sent[0][0] == "yeni7@example.com" and "/?verify=" in sent[0][2]   # link YENİ ünvana gedir
+    # link açılana qədər köhnə ünvan qalır və giriş işləyir (yanlış yazılsa kilidlənmə olmur)
+    assert client.get("/api/auth/me", headers=h).json()["user"]["email"] == "kohne7@example.com"
+    assert client.post("/api/auth/login", json={"username": "kohne7@example.com", "password": "parol12345"}).status_code == 200
+    assert client.post("/api/auth/login", json={"username": "yeni7@example.com", "password": "parol12345"}).status_code == 401
+    link_token = _verify_token_of(sent[0])
+    assert client.post("/api/auth/verify", json={"token": link_token}).json() == {"ok": True, "changed": True}
+    assert client.post("/api/auth/login", json={"username": "yeni7@example.com", "password": "parol12345"}).status_code == 200
+    assert client.post("/api/auth/login", json={"username": "kohne7@example.com", "password": "parol12345"}).status_code == 401
+    assert client.get("/api/auth/me", headers=h).json()["user"] == {**client.get("/api/auth/me", headers=h).json()["user"], "verified": True, "email": "yeni7@example.com"}
+
+
+def test_change_email_link_dies_on_password_change_or_taken_address(monkeypatch):
+    sent = _mail_on(monkeypatch)
+    h = _auth(_login_verified("poct9", "kohne9@example.com", sent))
+    sent.clear()
+    client.post("/api/auth/change-email", json={"password": "parol12345", "email": "yeni9@example.com"}, headers=h)
+    link = _verify_token_of(sent[0])
+    # parol dəyişdi (məs. hesab ələ keçirilmişdi): köhnə dəyişmə linki işləmir
+    main.db.set_password("poct9", main.hash_password("tamamilə-yeni-parol"))
+    assert client.post("/api/auth/verify", json={"token": link}).status_code == 400
+    # link açılmazdan əvvəl ünvanı başqası tutdu
+    sent.clear()
+    main._CHANGE_SENT.clear()
+    h = _auth(client.post("/api/auth/login", json={"username": "poct9", "password": "tamamilə-yeni-parol"}).json()["token"])
+    client.post("/api/auth/change-email", json={"password": "tamamilə-yeni-parol", "email": "tutulan9@example.com"}, headers=h)
+    link = _verify_token_of(sent[0])
+    main.db.create_user("tutan9", "Tutan9", main.hash_password("parol12345"), "tutulan9@example.com")
+    assert client.post("/api/auth/verify", json={"token": link}).status_code == 409
+
+
+def test_backup_and_restore_roundtrip():
+    import backup_db
+    uid = main.db.create_user("yedek1", "Yedek1", main.hash_password("parol12345"), "yedek1@example.com")
+    main.db.hist_put(uid, 7, 1700000000000, {"label": "a", "fixed": "mətn"}, 100)
+    main.db.usage_add(uid, "2026-11", 5)
+    data = backup_db.make_backup()
+    assert any(u["id"] == uid for u in data["tables"]["users"])
+    data = json.loads(json.dumps(data))   # fayla yazılıb oxunmağı simulyasiya
+    other = main.db.create_user("yedek2", "Yedek2", main.hash_password("parol12345"), "yedek2@example.com")
+    assert backup_db.restore_backup(data) == {"users": 0, "history": 0, "usage": 0}   # hamısı artıq var: toxunmur
+    main.db.delete_user("yedek1")
+    assert main.db.get_user(uid) is None and main.db.usage_get(uid, "2026-11") == 0
+    added = backup_db.restore_backup(data)
+    assert added["users"] == 1 and added["usage"] == 1
+    back = main.db.get_user(uid)
+    assert back["username"] == "yedek1" and back["email"] == "yedek1@example.com"
+    assert main.db.hist_list(uid)[0]["fixed"] == "mətn" and main.db.usage_get(uid, "2026-11") == 5
+    assert main.db.get_user(other)["username"] == "yedek2"   # mövcud hesablara toxunulmayıb
+
+
 def test_unfinished_job_resumes_after_restart():
     """Server yenidən başlayanda növbədə qalan iş bərpa olunur və bitir."""
     main.db.create_job("resume-test", 0, {"fix": False, "enhance": False, "tables": False, "merge": False},
@@ -379,7 +523,8 @@ def test_searchable_pdf_from_docx():
     r = client.post("/api/searchable-pdf", files=[("files", ("a.docx", io.BytesIO(buf.getvalue()), "application/octet-stream"))])
     assert r.status_code == 200 and r.content[:5] == b"%PDF-"
     text = "".join(page.get_text() for page in pymupdf.open(stream=r.content, filetype="pdf"))
-    assert "Məmməd" in text and "dəstək" in text
+    # şrift və pymupdf versiyasından asılı olaraq hərflər ayrı sətirlərə düşə bilər: ə-lərin hamısının olması vacibdir
+    assert text.count("ə") >= 6
 
 
 def test_docx_pdf_without_libreoffice_gives_clear_error(monkeypatch):

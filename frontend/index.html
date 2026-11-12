@@ -169,6 +169,8 @@
         <span class="lbl" x-text="online === null ? 'Yoxlanılır...' : online ? 'Server onlayn' : 'Server əlçatmazdır'"></span>
       </div>
       <p class="mt-2 text-xs text-muted" x-text="`${cfg.max_files} fayl · hər biri ${cfg.max_mb} MB-a qədər`"></p>
+      <p class="mt-1 text-xs" :class="usage.left <= 0 ? 'text-err' : 'text-muted'" x-show="usage.enabled" x-cloak
+         x-text="`Bu ay: ${usage.used} / ${usage.limit} səhifə`" title="Yalnız Azure OCR-dan keçən səhifələr sayılır"></p>
     </div>
   </aside>
 
@@ -193,7 +195,7 @@
     <div class="border-b border-line bg-raised">
       <div class="mx-auto flex max-w-[1400px] items-center gap-3 px-4 py-2 text-xs text-muted sm:px-8">
         <span class="lbl text-ink">Demo</span>
-        <span>Şəxsi sənəd yükləməyin. Fayllar Azure Document Intelligence-ə, “LLM ilə düzəlt” seçilibsə Gemini-yə də göndərilir.</span>
+        <span>Şəxsi sənəd yükləməyin. Fayllar Azure Document Intelligence-ə, “LLM ilə düzəlt” seçilibsə Gemini-yə də göndərilir. <a href="#/api" class="underline hover:text-ink" @click.prevent="go('api'); setTimeout(() => { const e = document.getElementById('privacy'); if (e) e.scrollIntoView({ behavior: 'smooth' }); }, 150)">Məxfilik</a></span>
       </div>
     </div>
 
@@ -804,6 +806,14 @@
                           <button type="button" class="btn" x-show="cfg.mail" :disabled="acct.mailBusy" @click="resendVerify()"><iconify-icon icon="lucide:mail-check"></iconify-icon>Link göndər</button></span>
                       </template>
                     </div>
+                    <form class="space-y-2 border-t border-line pt-4" @submit.prevent="changeEmail()">
+                      <p class="lbl">E-poçtu dəyiş</p>
+                      <p class="text-xs text-muted">Yeni ünvana link göndərilir. E-poçt linkə basandan sonra dəyişir.</p>
+                      <input type="email" class="field" x-model="acct.email" @input="acct.emailErr = ''" autocomplete="email" autocapitalize="none" placeholder="Yeni e-poçt" aria-label="Yeni e-poçt" />
+                      <input type="password" class="field" x-model="acct.emailPass" @input="acct.emailErr = ''" autocomplete="current-password" placeholder="Parol (təsdiq üçün)" aria-label="Parol" />
+                      <p class="min-h-[1rem] text-xs text-err" x-text="acct.emailErr"></p>
+                      <button type="submit" class="btn" :disabled="acct.emailBusy"><iconify-icon icon="lucide:mail"></iconify-icon><span x-text="acct.emailBusy ? 'Gözləyin...' : 'E-poçtu yenilə'"></span></button>
+                    </form>
                     <form class="space-y-2 border-t border-line pt-4" @submit.prevent="changePassword()">
                       <p class="lbl">Parolu dəyiş</p>
                       <input type="password" class="field" x-model="acct.cur" @input="acct.err = ''" autocomplete="current-password" placeholder="Cari parol" aria-label="Cari parol" />
@@ -837,13 +847,26 @@
                 <div class="p-5"><p class="lbl">Fayl ölçüsü</p><p class="mt-2 font-display text-2xl font-semibold tabular-nums"><span x-text="cfg.max_mb"></span><span class="ml-1 text-sm font-normal text-muted">MB</span></p><p class="mt-1 text-xs text-muted">hər fayl üçün</p></div>
                 <div class="p-5"><p class="lbl">OpenCV</p><p class="mt-2 font-display text-2xl font-semibold" x-text="cfg.opencv ? 'Var' : 'Yoxdur'"></p><p class="mt-1 text-xs text-muted">skan təmizləmə</p></div>
               </div>
+              <p class="mt-3 text-xs" x-show="usage.enabled" x-cloak :class="usage.left <= 0 ? 'text-err' : 'text-muted'" x-text="`Aylıq limitiniz: ${usage.used} / ${usage.limit} səhifə istifadə olunub (yalnız Azure OCR-dan keçən səhifələr sayılır; mətn qatlı PDF və ofis sənədləri sayılmır).`"></p>
               <p class="mt-3 text-xs text-muted">IP başına sorğu limiti serverdə <code class="font-mono">RATE_LIMIT</code> ilə təyin olunur. Limit aşılanda server 429 qaytarır.</p>
             </section>
           </div>
 
-          <!-- 04 sorğu jurnalı -->
+          <!-- 04 məxfilik -->
+          <section id="privacy">
+            <div class="mb-3 flex items-center gap-3"><span class="sec-n">04</span><h2 class="font-display text-sm font-medium">Məxfilik</h2></div>
+            <div class="box space-y-3 p-5 text-sm text-muted">
+              <p><span class="text-ink">Yüklədiyiniz fayl.</span> Emal üçün bazada müvəqqəti saxlanılır və emaldan sonra silinir. Nəticələr təxminən 6 saat qalır. Mənbə fayllar yalnız sizin brauzerinizin yerli yaddaşında qala bilər.</p>
+              <p><span class="text-ink">Tarixçə.</span> Hesab rejimində yalnız mətn və cədvəllər serverdə saxlanılır, hər hesab üçün ən çox 100 qeyd. “Tarixçəni təmizlə” ilə və ya hesabı siləndə silinir.</p>
+              <p><span class="text-ink">Üçüncü tərəflər.</span> Fayllar mətni oxumaq üçün Azure Document Intelligence-ə göndərilir. “LLM ilə düzəlt” seçilibsə mətn və şəkil Gemini-yə də gedir; Gemini-nin pulsuz səviyyəsində məlumat Google tərəfindən məhsulu yaxşılaşdırmaq üçün işlənə bilər. E-poçt məktubları Brevo ilə göndərilir, baza və server Neon və Render-dədir. Xəta izləmə (Sentry) qoşulubsa, xəta mətnləri ona göndərilir; parollar və yüklənən fayllar göndərilmir.</p>
+              <p><span class="text-ink">Layihə sahibi.</span> Bazanın sahibi kimi texniki olaraq saxlanılan mətnləri görə bilər. Parollar yalnız hash şəklində saxlanılır.</p>
+              <p><span class="text-ink">Tövsiyə.</span> Həssas və şəxsi sənədləri yükləməyin. İstədiyiniz vaxt yuxarıdakı “Hesabı sil” ilə hesabı və serverdəki bütün məlumatı silə bilərsiniz.</p>
+            </div>
+          </section>
+
+          <!-- 05 sorğu jurnalı -->
           <section>
-            <div class="mb-3 flex items-center gap-3"><span class="sec-n">04</span><h2 class="font-display text-sm font-medium">Sorğu jurnalı</h2><span class="chip">bu sessiya</span>
+            <div class="mb-3 flex items-center gap-3"><span class="sec-n">05</span><h2 class="font-display text-sm font-medium">Sorğu jurnalı</h2><span class="chip">bu sessiya</span>
               <button type="button" class="btn btn-sm ml-auto" @click="log = []" :disabled="!log.length"><iconify-icon icon="lucide:eraser"></iconify-icon>Təmizlə</button>
             </div>
             <div class="box overflow-hidden">
@@ -959,7 +982,9 @@
       page: "workspace", navOpen: false, online: null,
       cfg: { auth_required: false, mail: false, max_files: 20, max_mb: 10, opencv: false, docx_pdf: false },
       token: "", me: null, auth: { mode: "login", user: "", email: "", pass: "", invite: "", show: false, busy: false, err: "", info: "", resetToken: "", needVerify: false },
-      acct: { cur: "", next: "", err: "", busy: false, mailBusy: false, delOpen: false, delPass: "", delErr: "", delBusy: false },
+      acct: { cur: "", next: "", err: "", busy: false, mailBusy: false, delOpen: false, delPass: "", delErr: "", delBusy: false,
+              email: "", emailPass: "", emailErr: "", emailBusy: false },
+      usage: { enabled: false, limit: 0, used: 0, left: 0 },
       authed: false, boot: false, lastSync: 0, syncing: false,
       collapsed: false,
       opts: { fix: true, enhance: true, tables: false, merge: false },
@@ -1200,6 +1225,31 @@
         idb = makeIdb(user ? "az-ocr-u" + user.id : "az-ocr");
         await this.loadHist();
         this.syncHist();
+        this.loadUsage();
+      },
+      // bu ayın Azure səhifə limiti (server USER_MONTHLY_PAGES təyin edibsə)
+      async loadUsage() {
+        if (!this.cfg.auth_required || !this.authed) { this.usage.enabled = false; return; }
+        try {
+          const res = await this.api("/api/usage");
+          if (res.ok) this.usage = { enabled: false, limit: 0, used: 0, left: 0, ...(await res.json()) };
+        } catch {}
+      },
+      async changeEmail() {
+        const a = this.acct;
+        if (a.emailBusy) return;
+        if (!a.email.trim() || !a.emailPass) { a.emailErr = "Yeni e-poçtu və parolu yazın."; return; }
+        a.emailBusy = true; a.emailErr = "";
+        try {
+          const res = await this.api("/api/auth/change-email", {
+            method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: a.email.trim(), password: a.emailPass }),
+          });
+          if (!res.ok) { a.emailErr = await this.errorOf(res); return; }
+          const d = await res.json();
+          a.email = ""; a.emailPass = "";
+          this.toast(`Təsdiq linki ${d.pending_email} ünvanına göndərildi. E-poçt linkə basandan sonra dəyişəcək, o vaxta qədər köhnə ünvan qalır.`, "ok");
+        } catch (e) { a.emailErr = this.netMsg(e); }
+        finally { a.emailBusy = false; }
       },
       wipeWork() {
         this.items = []; this.results = []; this.sel = 0; this.picked = [];
@@ -1210,11 +1260,13 @@
         try {
           const res = await fetch("/api/auth/verify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token }) });
           if (!res.ok) { const m = await this.errorOf(res); this.auth.err = m; this.toast(m, "err"); return; }
+          const j = await res.json().catch(() => ({}));
+          const word = j.changed ? "E-poçt dəyişdi və təsdiqləndi." : "E-poçt təsdiqləndi.";
           this.auth.err = ""; this.auth.needVerify = false;
           if (!this.authed) this.auth.mode = "login";
-          this.auth.info = this.authed ? "E-poçt təsdiqləndi." : "E-poçt təsdiqləndi. İndi daxil ola bilərsiniz.";
-          this.toast("E-poçt təsdiqləndi.", "ok");
-          if (this.me) this.me.verified = true;
+          this.auth.info = this.authed ? word : word + " İndi daxil ola bilərsiniz.";
+          this.toast(word, "ok");
+          if (this.me) { this.me.verified = true; if (j.changed) this.verifyToken(); }
         } catch { this.toast("Serverə qoşulmaq olmadı.", "err"); }
       },
       async resendVerify() {
@@ -1463,6 +1515,7 @@
           else { const m = this.netMsg(err); items.forEach((i) => { i.status = "err"; i.msg = m; }); this.toast(m, "err"); }
         } finally {
           this.running = false; clearInterval(this.timer); this.abortCtl = null; this.jobId = null;
+          this.loadUsage();
         }
       },
       cancel() {

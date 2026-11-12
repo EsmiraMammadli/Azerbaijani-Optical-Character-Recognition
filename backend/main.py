@@ -29,6 +29,7 @@ from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Requ
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -99,6 +100,8 @@ MAIL_CONSOLE = os.getenv("MAIL_CONSOLE", "") == "1"             # yalnız lokal 
 RESET_TTL = int(os.getenv("RESET_MINUTES", "60")) * 60          # bərpa linki nə qədər etibarlıdır
 VERIFY_TTL = int(os.getenv("VERIFY_HOURS", "24")) * 3600        # e-poçt təsdiqi linki nə qədər etibarlıdır
 REQUIRE_VERIFIED = os.getenv("REQUIRE_EMAIL_VERIFICATION", "1") != "0"   # məktub xidməti varsa: təsdiqsiz hesab daxil ola bilməz
+USER_MONTHLY_PAGES = int(os.getenv("USER_MONTHLY_PAGES", "0"))   # hər hesab üçün aylıq Azure səhifə limiti; 0 = limitsiz
+RATE_LIMIT_STORAGE_URI = os.getenv("RATE_LIMIT_STORAGE_URI", "").strip()  # məs. rediss://... ; boşdursa yaddaşda
 SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()                # boşdursa Sentry söndürülüb
 APP_URL = os.getenv("APP_URL", "").strip().rstrip("/")          # bərpa linkinin ünvanı (Render-də avtomatik tapılır)
 HISTORY_MAX = int(os.getenv("HISTORY_MAX", "100"))        # hər istifadəçi üçün serverdə ən çox neçə tarixçə qeydi
@@ -176,7 +179,7 @@ if SENTRY_DSN:   # xəta izləmə (istəyə bağlı): yalnız SENTRY_DSN təyin 
     except ImportError:
         logging.getLogger("az-ocr").warning("SENTRY_DSN verilib, amma sentry-sdk quraşdırılmayıb.")
 
-limiter = Limiter(key_func=client_ip)
+limiter = Limiter(key_func=client_ip, storage_uri=RATE_LIMIT_STORAGE_URI or None)
 app = FastAPI(title="Azərbaycan dili OCR API", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -307,6 +310,30 @@ def read_verify_token(token: str):
         return None
 
 
+def make_email_change_token(user: dict, new_email: str) -> str:
+    """Yeni ünvanın təsdiqi nişanı ("c" açarı). Parol dəyişərsə etibarsız olur, ona görə ələ keçirilmiş hesabın köhnə sorğusu işləmir."""
+    payload = {"c": user["id"], "n": new_email, "e": int(time.time()) + VERIFY_TTL, "v": _pw_tag(user["pw_hash"])}
+    body = _b64(json.dumps(payload).encode("utf-8"))
+    return f"{body}.{_sign(body)}"
+
+
+def read_email_change_token(token: str):
+    """Nişan düzgündürsə (istifadəçi sətri, yeni e-poçt), əks halda None."""
+    try:
+        body, sig = token.strip().split(".")
+        if not hmac.compare_digest(sig, _sign(body)):
+            return None
+        data = json.loads(_unb64(body))
+        if data["e"] < time.time():
+            return None
+        user = db.get_user(int(data["c"]))
+        if not user or _pw_tag(user["pw_hash"]) != data["v"]:
+            return None
+        return user, str(data["n"])
+    except Exception:
+        return None
+
+
 def mail_mode():
     if BREVO_API_KEY and MAIL_FROM:
         return "brevo"
@@ -382,6 +409,56 @@ def account_user(user: dict = Depends(current_user)) -> dict:
 
 
 # ---------------------------------------------------------------- Mətn köməkçiləri
+def _month() -> str:
+    return time.strftime("%Y-%m", time.gmtime())
+
+
+def quota_info(user: dict):
+    """Aylıq limit məlumatı; limit söndürülübsə (və ya hesabsız rejimdə) None."""
+    if not APP_PASSWORD or not USER_MONTHLY_PAGES or not user.get("id"):
+        return None
+    used = db.usage_get(user["id"], _month())
+    return {"enabled": True, "limit": USER_MONTHLY_PAGES, "used": used,
+            "left": max(0, USER_MONTHLY_PAGES - used), "month": _month()}
+
+
+def quota_error(user: dict):
+    q = quota_info(user)
+    if q and q["left"] <= 0:
+        return f"Aylıq limit ({q['limit']} səhifə) bitib. Növbəti ayın əvvəlində yenilənir."
+    return None
+
+
+def check_quota(user: dict) -> None:
+    msg = quota_error(user)
+    if msg:
+        raise HTTPException(429, msg)
+
+
+def charge_quota(user: dict, res: dict) -> None:
+    """Yalnız Azure-dan keçən səhifələr sayılır (mətn qatlı PDF və ofis sənədləri limitə girmir)."""
+    if quota_info(user) is None or "error" in res:
+        return
+    if "azure" in str(res.get("method") or ""):
+        db.usage_add(user["id"], _month(), int(res.get("pages") or 0))
+
+
+def estimate_azure_pages(items) -> int:
+    """Axtarışlı PDF üçün: Azure-a gedəcək təxmini səhifə sayı."""
+    n = 0
+    for name, data in items:
+        ext = os.path.splitext(name or "")[1].lower()
+        if ext in PDF_EXT:
+            if not extract_text_layer(data)[0]:
+                try:
+                    n += len(fitz.open(stream=data, filetype="pdf"))
+                except Exception:
+                    n += 1
+        elif ext in IMAGE_EXT:
+            n += 1
+    return n
+
+
 def normalize_az(text: str) -> str:
     """OCR-ın səhv Unicode simvollarını düzgün Azərbaycan hərflərinə çevirir."""
     table = {
@@ -1185,13 +1262,19 @@ def _run_job(job_id: str):
             if nxt is None:
                 break
             idx, name, data = nxt
-            try:
-                res = process_bytes(name, data, fix=job["fix"], enhance=job["enhance"], tables=job["tables"])
-            except HTTPException as e:
-                res = {"filename": name, "error": str(e.detail)}
-            except Exception:  # gözlənilməyən xəta bütün işi dayandırmasın
-                log.exception("Fayl emal edilmədi: %s", name)
-                res = {"filename": name, "error": f"{name}: emal zamanı gözlənilməyən xəta."}
+            owner = {"id": job["user_id"]}
+            limit_msg = quota_error(owner)
+            if limit_msg:   # limit iş davam edərkən bitdi: qalan fayllar işlənmir
+                res = {"filename": name, "error": f"{name}: {limit_msg}"}
+            else:
+                try:
+                    res = process_bytes(name, data, fix=job["fix"], enhance=job["enhance"], tables=job["tables"])
+                    charge_quota(owner, res)
+                except HTTPException as e:
+                    res = {"filename": name, "error": str(e.detail)}
+                except Exception:  # gözlənilməyən xəta bütün işi dayandırmasın
+                    log.exception("Fayl emal edilmədi: %s", name)
+                    res = {"filename": name, "error": f"{name}: emal zamanı gözlənilməyən xəta."}
             db.finish_file(job_id, idx, res)
         if db.job_cancelled(job_id):
             db.cancel_job_final(job_id)
@@ -1383,6 +1466,11 @@ class VerifyIn(BaseModel):
     token: str
 
 
+class ChangeEmailIn(BaseModel):
+    password: str
+    email: str
+
+
 class ChangePasswordIn(BaseModel):
     current: str
     new: str
@@ -1484,6 +1572,7 @@ def login(request: Request, body: LoginIn):
 
 
 _VERIFY_SENT: dict = {}     # istifadəçi nömrəsi -> son təsdiq məktubunun vaxtı
+_CHANGE_SENT: dict = {}     # istifadəçi nömrəsi -> son e-poçt dəyişmə məktubunun vaxtı
 _RESET_SENT: dict = {}      # istifadəçi nömrəsi -> son bərpa məktubunun vaxtı (e-poçt spamının qarşısı)
 RESET_COOLDOWN = 60
 
@@ -1535,10 +1624,22 @@ def verify_email(request: Request, body: VerifyIn):
     if not APP_PASSWORD:
         raise HTTPException(400, "Bu serverdə hesab rejimi qoşulmayıb (APP_PASSWORD təyin olunmayıb).")
     user = read_verify_token(body.token)
-    if not user:
-        raise HTTPException(400, "Link etibarsızdır və ya müddəti bitib. Proqramın içindən yenisini istəyin.")
-    db.set_email_verified(user["id"])
-    return {"ok": True}
+    if user:
+        db.set_email_verified(user["id"])
+        return {"ok": True}
+    change = read_email_change_token(body.token)
+    if change:   # e-poçt dəyişmə: yeni ünvan yalnız link açılanda hesaba yazılır
+        user, new_email = change
+        other = db.get_user_by_email(new_email)
+        if other and other["id"] != user["id"]:
+            raise HTTPException(409, "Bu e-poçt artıq başqa hesabda istifadə olunur.")
+        try:
+            db.set_email(user["username"], new_email)
+        except IntegrityError:
+            raise HTTPException(409, "Bu e-poçt artıq başqa hesabda istifadə olunur.")
+        db.set_email_verified(user["id"])
+        return {"ok": True, "changed": True}
+    raise HTTPException(400, "Link etibarsızdır və ya müddəti bitib. Proqramın içindən yenisini istəyin.")
 
 
 class ResendIn(BaseModel):
@@ -1621,6 +1722,41 @@ def reset_password(request: Request, body: ResetIn):
     return {"token": make_token(row), "user": _public_user(row)}
 
 
+@app.get("/api/usage")
+def usage(user: dict = Depends(account_user)):
+    return quota_info(user) or {"enabled": False}
+
+
+@app.post("/api/auth/change-email")
+@limiter.limit(AUTH_RATE_LIMIT)
+def change_email(request: Request, body: ChangeEmailIn, background: BackgroundTasks,
+                 user: dict = Depends(account_user)):
+    """E-poçtu dəyişmək üçün yeni ünvana link göndərir (parol tələb olunur).
+    Ünvan yalnız link açılanda dəyişir: yanlış yazılsa, köhnə ünvan qalır və hesaba giriş itmir."""
+    row = db.get_user(user["id"])
+    if not row or not check_password(body.password, row["pw_hash"]):
+        raise HTTPException(403, "Parol səhvdir.")
+    email = body.email.strip().casefold()
+    if len(email) > 254 or not EMAIL_RE.match(email):
+        raise HTTPException(400, "E-poçt ünvanı düzgün deyil.")
+    if email == (row.get("email") or ""):
+        raise HTTPException(400, "Bu ünvan artıq hesabınızdadır.")
+    other = db.get_user_by_email(email)
+    if other and other["id"] != row["id"]:
+        raise HTTPException(409, "Bu e-poçt artıq istifadə olunur.")
+    if mail_mode() is None:
+        raise HTTPException(503, "Bu serverdə e-poçt xidməti qoşulmayıb, ünvanı dəyişmək olmur.")
+    wait = RESET_COOLDOWN - (time.time() - _CHANGE_SENT.get(row["id"], 0))
+    if wait > 0:
+        raise HTTPException(429, f"Bir az gözləyin: yeni məktub {int(wait) + 1} saniyədən sonra göndərilə bilər.")
+    if len(_CHANGE_SENT) > 1000:
+        _CHANGE_SENT.clear()
+    _CHANGE_SENT[row["id"]] = time.time()
+    link = f"{_base_url(request)}/?verify={make_email_change_token(row, email)}"
+    background.add_task(_send_verify_mail, {**row, "email": email}, link)   # məktub YENİ ünvana gedir
+    return {"ok": True, "pending_email": email}
+
+
 @app.post("/api/auth/change-password")
 @limiter.limit(AUTH_RATE_LIMIT)
 def change_password(request: Request, body: ChangePasswordIn, user: dict = Depends(account_user)):
@@ -1680,15 +1816,23 @@ def history_clear(user: dict = Depends(account_user)):
     return {"ok": True}
 
 
-@app.post("/api/ocr", dependencies=[Depends(current_user)])
+@app.post("/api/ocr")
 @limiter.limit(RATE_LIMIT)
 def ocr(request: Request, files: List[UploadFile] = File(...), fix: bool = True,
-        enhance: bool = False, tables: bool = False, merge: bool = False):
+        enhance: bool = False, tables: bool = False, merge: bool = False,
+        user: dict = Depends(current_user)):
+    check_quota(user)
     items = read_uploads(files)
     results = []
     for name, data in items:
+        limit_msg = quota_error(user)
+        if limit_msg:
+            results.append({"filename": name, "error": f"{name}: {limit_msg}"})
+            continue
         try:
-            results.append(process_bytes(name, data, fix=fix, enhance=enhance, tables=tables))
+            res = process_bytes(name, data, fix=fix, enhance=enhance, tables=tables)
+            charge_quota(user, res)
+            results.append(res)
         except HTTPException as e:
             results.append({"filename": name, "error": str(e.detail)})
     if merge and len(results) > 1:
@@ -1702,6 +1846,7 @@ def create_job(request: Request, files: List[UploadFile] = File(...), fix: bool 
                enhance: bool = False, tables: bool = False, merge: bool = False,
                user: dict = Depends(current_user)):
     """Faylları qəbul edir və dərhal iş nömrəsi qaytarır; emal arxa planda gedir."""
+    check_quota(user)
     items = read_uploads(files)
     db.purge_jobs(JOB_TTL)
     if db.active_job_count() >= MAX_ACTIVE_JOBS:
@@ -1730,14 +1875,18 @@ def cancel_job(job_id: str, user: dict = Depends(current_user)):
     return {"ok": True}
 
 
-@app.post("/api/searchable-pdf", dependencies=[Depends(current_user)])
+@app.post("/api/searchable-pdf")
 @limiter.limit(RATE_LIMIT)
-def searchable_pdf(request: Request, files: List[UploadFile] = File(...), enhance: bool = False):
+def searchable_pdf(request: Request, files: List[UploadFile] = File(...), enhance: bool = False,
+                   user: dict = Depends(current_user)):
+    check_quota(user)
     items = read_uploads(files)
     try:
         pdf, font_warning = build_searchable_pdf(items, enhance)
     except HttpResponseError as e:
         raise HTTPException(502, f"Azure xətası: {e.message}")
+    if quota_info(user) is not None:
+        db.usage_add(user["id"], _month(), estimate_azure_pages(items))
     headers = {"Content-Disposition": 'attachment; filename="axtarisli.pdf"'}
     if font_warning:
         headers["X-Warning"] = "font"

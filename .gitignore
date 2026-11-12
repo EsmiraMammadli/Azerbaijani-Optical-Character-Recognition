@@ -42,3 +42,6 @@ backend/data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# backups (contain password hashes and user texts)
+backend/backups/

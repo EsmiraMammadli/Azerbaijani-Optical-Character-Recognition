@@ -1,6 +1,7 @@
 """İstifadəçiləri idarə etmək (backend qovluğundan işə salın).
 
     python manage_users.py list              hamısına bax
+    python manage_users.py usage             bu ayın Azure səhifə istifadəsi (USER_MONTHLY_PAGES limiti üçün)
     python manage_users.py add ad            yeni hesab (parolu və e-poçtu soruşur)
     python manage_users.py setemail ad poçt  hesaba e-poçt yaz (köhnə hesablar üçün; parol bərpası bu ünvana gedir)
     python manage_users.py passwd ad         parolu dəyişdir (köhnə girişlər avtomatik bağlanır)
@@ -35,7 +36,7 @@ def ask_password() -> str:
 
 
 def main_cli(argv):
-    if not argv or argv[0] not in ("list", "add", "passwd", "delete", "setemail"):
+    if not argv or argv[0] not in ("list", "usage", "add", "passwd", "delete", "setemail"):
         print(__doc__)
         return 1
     cmd = argv[0]
@@ -45,6 +46,13 @@ def main_cli(argv):
             print("İstifadəçi yoxdur.")
         for u in rows:
             print(f'{u["id"]:>3}  {u["display"]:<32} {(u.get("email") or "-"):<36} {time.strftime("%Y-%m-%d %H:%M", time.localtime(u["created"]))}')
+        return 0
+    if cmd == "usage":
+        month = main._month()
+        used = db.usage_list(month)
+        print(f"Ay: {month} | limit: {main.USER_MONTHLY_PAGES or 'yoxdur'}")
+        for u in db.list_users():
+            print(f'{u["id"]:>3}  {u["display"]:<32} {used.get(u["id"], 0):>5} səhifə')
         return 0
     if len(argv) < 2:
         print("İstifadəçi adını yazın.")

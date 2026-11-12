@@ -18,3 +18,5 @@ README.md
 **/*.db
 **/*.sqlite*
 **/*.log
+.github
+backend/backups

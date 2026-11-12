@@ -92,6 +92,14 @@ history = Table(
 )
 
 
+usage = Table(
+    "usage", metadata,
+    Column("user_id", Integer, primary_key=True),
+    Column("month", String(7), primary_key=True),      # "2026-11" (UTC)
+    Column("pages", Integer, nullable=False, default=0),
+)
+
+
 def _migrate(eng):
     """Köhnə bazaya yeni sütunları (email, email_verified) əlavə edir. Təkrar çağırmaq zərərsizdir."""
     with eng.begin() as c:
@@ -196,12 +204,41 @@ def delete_user(username: str) -> bool:
         return False
     with engine.begin() as c:
         c.execute(delete(history).where(history.c.user_id == user["id"]))
+        c.execute(delete(usage).where(usage.c.user_id == user["id"]))
         old = [r[0] for r in c.execute(select(jobs.c.id).where(jobs.c.user_id == user["id"]))]
         for jid in old:
             c.execute(delete(job_files).where(job_files.c.job_id == jid))
         c.execute(delete(jobs).where(jobs.c.user_id == user["id"]))
         c.execute(delete(users).where(users.c.id == user["id"]))
     return True
+
+
+# ---------------------------------------------------------------- aylıq istifadə (Azure səhifələri)
+def usage_get(user_id: int, month: str) -> int:
+    with engine.connect() as c:
+        val = c.execute(select(usage.c.pages).where(usage.c.user_id == user_id, usage.c.month == month)).scalar()
+    return int(val or 0)
+
+
+def usage_add(user_id: int, month: str, pages: int):
+    if pages <= 0:
+        return
+    cond = (usage.c.user_id == user_id, usage.c.month == month)
+    with engine.begin() as c:
+        n = c.execute(update(usage).where(*cond).values(pages=usage.c.pages + pages)).rowcount
+    if n == 0:
+        try:
+            with engine.begin() as c:
+                c.execute(insert(usage).values(user_id=user_id, month=month, pages=pages))
+        except IntegrityError:  # eyni anda iki sorğu gəldi: üstünə əlavə et
+            with engine.begin() as c:
+                c.execute(update(usage).where(*cond).values(pages=usage.c.pages + pages))
+
+
+def usage_list(month: str):
+    with engine.connect() as c:
+        rows = c.execute(select(usage.c.user_id, usage.c.pages).where(usage.c.month == month)).all()
+    return {int(u): int(p) for u, p in rows}
 
 
 # ---------------------------------------------------------------- iş növbəsi
