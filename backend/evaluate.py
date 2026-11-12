@@ -9,13 +9,14 @@ Qovluq quruluşu:
     eval/samples/<ad>.jpg|png|pdf|...   sınaq sənədləri
     eval/ground_truth/<ad>.txt          əl ilə yazılmış düzgün mətn (UTF-8)
 
-Nəticə: eval/results.md və eval/results.csv
+Nəticə: eval/results.md, eval/results.csv və eval/letters.md (xüsusi hərflər üzrə: Ə, ı, İ, ö, ü, ç, ş, ğ, q, x, j)
 """
 import argparse
 import csv
 import os
 import re
 import sys
+from collections import Counter
 
 import jiwer
 
@@ -38,6 +39,45 @@ def score(ref: str, hyp: str):
     return jiwer.cer(ref, hyp), jiwer.wer(ref, hyp)
 
 
+SPECIAL = "ƏəİıÖöÜüÇçŞşĞğQqXxJj"   # Azərbaycan dilinə xas və tez qarışdırılan hərflər
+
+
+def letter_stats(pairs):
+    """pairs: [(düzgün_mətn, oxunan_mətn)]. Hər xüsusi hərf üçün [cəmi, düzgün, Counter(nəyə çevrilib)] qaytarır.
+    "∅" hərfin oxunan mətndə düşdüyü deməkdir."""
+    stats = {ch: [0, 0, Counter()] for ch in SPECIAL}
+    for ref, hyp in pairs:
+        ref, hyp = norm(ref), norm(hyp)
+        if not ref:
+            continue
+        out = jiwer.process_characters(ref, hyp)
+        for c in out.alignments[0]:
+            for k in range(c.ref_start_idx, c.ref_end_idx):
+                ch = ref[k]
+                if ch not in stats:
+                    continue
+                st = stats[ch]
+                st[0] += 1
+                if c.type == "equal":
+                    st[1] += 1
+                elif c.type == "substitute":
+                    st[2][hyp[c.hyp_start_idx + (k - c.ref_start_idx)]] += 1
+                else:
+                    st[2]["∅"] += 1
+    return stats
+
+
+def letters_table(stats) -> str:
+    lines = ["| Hərf | Sayı | Düzgün | Ən çox necə oxunub |", "|---|---|---|---|"]
+    for ch in SPECIAL:
+        total, ok, errs = stats[ch]
+        if not total:
+            continue
+        top = ", ".join(f"`{c}` ×{n}" for c, n in errs.most_common(3)) or "-"
+        lines.append(f"| {ch} | {total} | {ok / total * 100:.0f}% | {top} |")
+    return "\n".join(lines)
+
+
 def pct(x):
     return "-" if x is None else f"{x * 100:.1f}%"
 
@@ -57,6 +97,7 @@ def main():
         sys.exit(f"{SAMPLES} qovluğunda sənəd yoxdur.")
 
     rows, skipped = [], []
+    raw_pairs, fix_pairs = [], []
     for name in names:
         stem = os.path.splitext(name)[0]
         truth_path = os.path.join(TRUTH, stem + ".txt")
@@ -77,6 +118,9 @@ def main():
 
         raw_cer, raw_wer = score(truth, res["raw_text"])
         llm_ok = res["llm_fixed"]
+        raw_pairs.append((truth, res["raw_text"]))
+        if llm_ok:
+            fix_pairs.append((truth, res["text"]))
         fix_cer, fix_wer = score(truth, res["text"]) if llm_ok else (None, None)
         rows.append({
             "file": name, "method": res["method"], "ref_chars": len(norm(truth)),
@@ -121,11 +165,17 @@ def main():
 
     with open(os.path.join(HERE, "eval", "results.md"), "w", encoding="utf-8") as f:
         f.write(out)
+    letters = "### Xam Azure OCR\n\n" + letters_table(letter_stats(raw_pairs)) + "\n"
+    if fix_pairs:
+        letters += "\n### LLM düzəlişindən sonra\n\n" + letters_table(letter_stats(fix_pairs)) + "\n"
+    print("\nXüsusi hərflər üzrə nəticə:\n\n" + letters)
+    with open(os.path.join(HERE, "eval", "letters.md"), "w", encoding="utf-8") as f:
+        f.write(letters)
     with open(os.path.join(HERE, "eval", "results.csv"), "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
-    print("Yazıldı: eval/results.md, eval/results.csv")
+    print("Yazıldı: eval/results.md, eval/results.csv, eval/letters.md")
 
 
 if __name__ == "__main__":
