@@ -559,6 +559,24 @@ def test_normalize_az():
     assert main.normalize_az("Ǝzǝrbaycan") == "Əzərbaycan"
     assert main.normalize_az("V\u0110 LOGİSTİKA") == "VƏ LOGİSTİKA"   # Đ -> Ə
     assert main.normalize_az("m\u0111mm\u0111d") == "məmməd"
+    # ayrıca işarələr birləşdirilir: o+¨, c+¸, g+˘, I+˙
+    assert main.normalize_az("o\u0308 c\u0327 g\u0306 I\u0307") == "ö ç ğ İ"
+    assert main.normalize_az("\u0219\u0218 \u01e7\u01e6") == "şŞ ğĞ"
+    # tam böyük hərfli sözdə kiçik ə -> Ə; adi sözlər dəyişmir
+    assert main.normalize_az("XİDMəTİ Va LOGİSTİKA") == "XİDMƏTİ Va LOGİSTİKA"
+    assert main.normalize_az("Məmməd Və Mə və") == "Məmməd Və Mə və"
+
+
+def test_letter_stats():
+    import evaluate
+    st = evaluate.letter_stats([("XİDMƏTİ VƏ", "XİDMOTİ VĐ")])
+    total, ok, errs = st["Ə"]
+    assert (total, ok) == (2, 0) and errs["O"] == 1 and errs["\u0110"] == 1
+    assert st["İ"][:2] == [2, 2]
+    # normalize_az Đ-ni düzəldir, O-nu yox
+    st = evaluate.letter_stats([("XİDMƏTİ VƏ", main.normalize_az("XİDMOTİ VĐ"))])
+    assert st["Ə"][:2] == [2, 1]
+    assert "Ə" in evaluate.letters_table(st)
 
 
 def test_html_reader_strips_tags_and_scripts():

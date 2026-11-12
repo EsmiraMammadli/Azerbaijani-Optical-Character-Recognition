@@ -1533,7 +1533,17 @@
       get warns() {
         if (!this.hasR) return [];
         const d = this.r.data, out = [];
-        if (d.llm_error) { console.warn(d.llm_error); out.push({ icon: "sparkles", title: "LLM işləmədi", text: "LLM düzəlişi alınmadı, xam mətn göstərilir." }); }
+        if (d.llm_error) {
+          console.warn(d.llm_error);
+          const e = String(d.llm_error);
+          const why = /429|RESOURCE_EXHAUSTED|quota/i.test(e) ? "Gemini limiti dolub."
+            : /503|UNAVAILABLE|overloaded/i.test(e) ? "Gemini hazırda yüklənib."
+            : /404|NOT_FOUND/i.test(e) ? "Model adı tapılmadı (LLM_MODEL yoxlanmalıdır)."
+            : /401|403|API key|PERMISSION_DENIED|UNAUTHENTICATED|INVALID_ARGUMENT/i.test(e) ? "Gemini açarı qəbul edilmədi."
+            : /GEMINI_API_KEY/.test(e) ? "GEMINI_API_KEY təyin olunmayıb."
+            : "";
+          out.push({ icon: "sparkles", title: "LLM işləmədi", text: ("LLM düzəlişi alınmadı, xam mətn göstərilir. " + why).trim() });
+        }
         (d.warnings || []).forEach((w) => out.push({ icon: "triangle-alert", title: "Xəbərdarlıq", text: w }));
         return out;
       },

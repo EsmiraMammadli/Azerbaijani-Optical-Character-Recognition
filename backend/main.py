@@ -13,6 +13,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
@@ -138,6 +139,8 @@ Sənə OCR ilə çıxarılmış mətn (və mümkünsə sənədin şəkli) verili
 OCR mətnində tipik səhvlər var:
 - "ə" hərfi tez-tez "o", "a", "e" və ya "ǝ" kimi səhv oxunur (məs. "Mammadli" → "Məmmədli", "Azerbaycan" → "Azərbaycan", "dastayi" → "dəstəyi")
 - BÖYÜK "Ə" hərfi (xüsusilə kiçik, böyük hərflərlə yazılmış başlıq və loqolarda) "O", "Đ", "D", "Ɵ", "3" və ya "E" kimi səhv oxunur (məs. "XİDMOTİ" → "XİDMƏTİ", "VĐ" → "VƏ", "MƏRKƏZ" yerinə "MORKOZ"). Şəkildə Ə görünürsə, onu mütləq Ə kimi yaz.
+- BÖYÜK hərflərlə yazılmış mətndə işarələr itir: "Ö"→"O", "Ü"→"U", "Ç"→"C", "Ş"→"S", "Ğ"→"G", "İ"→"I". Şəkildə nöqtə, kökçə və ya yarımdairə görünürsə, hərfi bərpa et.
+- "ı", "i", "l", "1", "I" bir-birinə qarışır; "q" ilə "g", "o", "9"; "x" ilə "h", "k"; "j" ilə "i" qarışır. Şəkildəki hərfə uyğun yaz.
 - "ı", "İ", "ö", "ü", "ç", "ş", "ğ" hərfləri düşür və ya dəyişir
 - loqo, möhür, imza və suvenirlərdən gələn mənasız simvol sətirləri
 
@@ -469,10 +472,29 @@ def normalize_az(text: str) -> str:
         "\u0110": "\u018f",        # Đ -> Ə (kiçik BÖYÜK hərfli yazılarda Ə tez-tez belə oxunur)
         "\u0111": "\u0259",        # đ -> ə
         "\u0258": "\u0259",        # ɘ -> ə
+        "i\u0307": "i",             # i + kombinasiya nöqtəsi -> i
+        "\u0219": "\u015f",        # ș (Rumın, vergüllü) -> ş
+        "\u0218": "\u015e",        # Ș -> Ş
+        "\u01e7": "\u011f",        # ǧ -> ğ
+        "\u01e6": "\u011e",        # Ǧ -> Ğ
     }
     for bad, good in table.items():
         text = text.replace(bad, good)
-    return text
+    # hərf + ayrıca işarə (o + ¨, c + ¸, g + ˘, I + ˙ ...) -> tək hərf (ö, ç, ğ, İ ...)
+    text = unicodedata.normalize("NFC", text)
+    # tam BÖYÜK hərfli sözdə kiçik "ə" -> "Ə" (məs. XİDMəTİ -> XİDMƏTİ). Ən azı 2 böyük hərf tələb olunur ki,
+    # "Mə..." kimi adi sözlər dəyişməsin.
+    return re.sub(r"[^\W\d_]+", _caps_schwa, text)
+
+
+def _caps_schwa(m) -> str:
+    w = m.group(0)
+    if "\u0259" not in w:
+        return w
+    others = [c for c in w if c != "\u0259"]
+    if len(others) >= 2 and all(c.isupper() for c in others):
+        return w.replace("\u0259", "\u018f")
+    return w
 
 
 def page_to_text(page, y_tol: float = 4.0, col_gap: float = 25.0) -> str:
@@ -1131,6 +1153,7 @@ def fix_with_llm(raw_text: str, file_bytes: bytes = None, mime_type: str = None)
     if fixed is not None and not cut:
         return fixed, None, f"{mode} ({used})"
     if fixed is None:
+        log.warning("LLM düzəlişi alınmadı: %s", " || ".join(errors))
         return raw_text, "LLM xətası: " + " || ".join(errors), mode
 
     # cavab limitə çatıb kəsilib: mətn hissələrə bölünür (şəkilsiz), alınmayan hissə xam qalır
