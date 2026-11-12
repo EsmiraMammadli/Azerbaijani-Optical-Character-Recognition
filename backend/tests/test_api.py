@@ -18,6 +18,11 @@ os.environ.setdefault("AZURE_DI_KEY", "test-key")
 os.environ.setdefault("RATE_LIMIT", "1000/minute")
 os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
 os.environ.pop("APP_PASSWORD", None)
+# lokal backend/.env testlərə təsir etməsin (load_dotenv mövcud dəyişənlərin üzərinə yazmır)
+for _k in ("BREVO_API_KEY", "MAIL_FROM", "SMTP_HOST", "SMTP_USER", "MAIL_CONSOLE", "SENTRY_DSN", "RATE_LIMIT_STORAGE_URI"):
+    os.environ[_k] = ""
+os.environ["USER_MONTHLY_PAGES"] = "0"
+os.environ["REQUIRE_EMAIL_VERIFICATION"] = "1"
 # testlər həqiqi bazaya toxunmasın: müvəqqəti SQLite faylı
 os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(tempfile.mkdtemp(), "test.db").replace("\\", "/")
 
