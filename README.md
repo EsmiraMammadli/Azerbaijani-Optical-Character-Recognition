@@ -8,7 +8,7 @@ The interface is in Azerbaijani.
 
 **Live demo:** https://azerbaijani-optical-character-recognition.onrender.com/
 
-Sign-up needs a registration code. The demo runs on Render's free plan, so the first request after a period of inactivity can take about a minute while the service wakes up. Do not upload personal documents to it.
+Sign-up needs a registration code. The demo runs on Render's free plan, which puts a service to sleep after a period without traffic. An UptimeRobot monitor pings `/healthz` every 5 minutes to keep it awake, but the first request can still take up to a minute if the service did go to sleep. Errors are tracked with Sentry (see [Monitoring](#monitoring)). Do not upload personal documents to it.
 
 ![Workspace: file upload and options](docs/screenshots/03-workspace.png)
 
@@ -96,7 +96,7 @@ File ──► format check
 | Documents | PyMuPDF, python-docx, python-pptx, openpyxl, LibreOffice (DOCX → PDF) |
 | Database | SQLite (local) or Postgres (`DATABASE_URL`, e.g. Neon) via SQLAlchemy |
 | Frontend | `frontend/index.html`, a single file served by the same server |
-| Other | slowapi (rate limiting), Sentry (optional), Brevo (email) |
+| Other | slowapi (rate limiting), Brevo (email), Sentry (error tracking), UptimeRobot (uptime monitoring and keep-alive pings) |
 
 ## Getting started
 
@@ -169,7 +169,12 @@ Searchable PDF from DOCX needs LibreOffice (`soffice`). The Docker image install
 | `REQUIRE_EMAIL_VERIFICATION` | no | Default `1`: with a mail service, unverified accounts cannot log in. `0` disables it |
 | `SENTRY_DSN` | no | If set, errors are sent to Sentry (passwords, request bodies and IPs are not sent) |
 | `SENTRY_ENV` | no | Sentry environment name, default `production` |
-| `MAIL_CONSOLE` | no | `1` prints emails to the terminal instead of sending them (local testing only) |
+| `MAIL_CONSOLE` | no | `1` prints emails to the terminal instead of sending them (local testing only). Do not set it on the server: if Brevo is not configured, emails would only be written to the log |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | no | Own SMTP server as an alternative to Brevo (port default `587`). Brevo has priority when both are set. Free Render plans block outgoing SMTP |
+| `AZURE_PAGES_PER_CALL` | no | Azure F0 (free) reads only 2 pages per request, so long PDFs are sent in chunks of this size, default `2`. Use `0` on the paid S0 tier |
+| `LLM_CHUNK_CHARS` | no | Text size per Gemini request, default `6000` |
+| `HISTORY_MAX_CHARS` | no | Maximum characters stored per history entry, default `2000000` |
+| `LO_TIMEOUT_SECONDS` | no | LibreOffice conversion timeout for DOCX/PPTX/XLSX, default `120` |
 
 `yes` means the app does not start without it. `on a server` means it is optional locally but needed for a public deployment (without `DATABASE_URL`, accounts live in a SQLite file that Render's free plan wipes on every redeploy). `no` means optional.
 
@@ -300,9 +305,26 @@ docker run --rm -p 8000:8000 --env-file backend/.env az-ocr
 1. Push the project to GitHub (without `.env`).
 2. On render.com: New → Web Service → select the repo.
 3. Easiest: choose **Docker** as the language and leave Root Directory empty. The Dockerfile is in the project root.
-4. In Environment, add `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY`, `GEMINI_API_KEY`, `LLM_MODEL`, `APP_PASSWORD` and `SESSION_SECRET`.
+4. In Environment, add the variables from the table below.
 5. Connect an external Postgres (e.g. Neon) through `DATABASE_URL` so accounts and history survive restarts. A local SQLite file is wiped on redeploy on Render's free plan.
-6. Add `BREVO_API_KEY` and `MAIL_FROM` for password reset and email verification.
+6. Set up the Brevo variables for password reset and email verification, then add the UptimeRobot and Sentry monitors (see [Monitoring](#monitoring)).
+
+Environment used by the live demo (values are secrets and are never committed):
+
+| Variable | What to put |
+|---|---|
+| `AZURE_DI_ENDPOINT`, `AZURE_DI_KEY` | Endpoint and key of the Azure Document Intelligence resource |
+| `GEMINI_API_KEY` | Google AI Studio key |
+| `LLM_MODEL`, `LLM_FALLBACK_MODEL` | Main and backup Gemini model names |
+| `APP_PASSWORD` | Registration code you give to people who may create accounts. Use a code that is hard to guess |
+| `SESSION_SECRET` | Long random string, for example `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Use a different value than locally. Changing it logs everyone out |
+| `DATABASE_URL` | Neon Postgres connection string |
+| `BREVO_API_KEY`, `MAIL_FROM` | Brevo API key and the verified sender address |
+| `USER_MONTHLY_PAGES` | Monthly Azure page limit per account, for example `50` |
+| `RATE_LIMIT` | OCR requests per IP, for example `10/minute` |
+| `SENTRY_DSN` | DSN of the Sentry project |
+
+`MAIL_CONSOLE` is intentionally not set on the server. Email verification is on by default (`REQUIRE_EMAIL_VERIFICATION=1`). Everything else uses the defaults from the table above.
 
 Without Docker: choose a Python environment, Build Command `pip install -r backend/requirements.txt`, Start Command `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT`. In that case searchable PDF from DOCX will not work (no LibreOffice).
 
