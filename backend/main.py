@@ -1113,7 +1113,7 @@ def _split_text(text: str, size: int):
 def _llm_generate(contents, config, models, errors):
     """(mətn, kəsilib_mi, model) qaytarır; alınmazsa (None, False, None). 503/429-da təkrar cəhd + ehtiyat model."""
     for model_name in models:
-        for attempt in range(3):
+        for attempt in range(4):
             try:
                 resp = llm.models.generate_content(model=model_name, contents=contents, config=config)
                 fixed = (resp.text or "").strip()
@@ -1123,8 +1123,8 @@ def _llm_generate(contents, config, models, errors):
                 return fixed, _truncated(resp), model_name
             except Exception as e:
                 errors.append(f"{model_name} (cəhd {attempt + 1}): {str(e)[:200]}")
-                if any(code in str(e) for code in RETRYABLE) and attempt < 2:
-                    time.sleep(2 * (attempt + 1))
+                if any(code in str(e) for code in RETRYABLE) and attempt < 3:
+                    time.sleep(2 ** (attempt + 1))   # 2, 4, 8 san.
                     continue
                 break
     return None, False, None
@@ -1146,10 +1146,15 @@ def fix_with_llm(raw_text: str, file_bytes: bytes = None, mime_type: str = None)
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT, temperature=0, max_output_tokens=65536
     )
-    models = [LLM_MODEL] + ([LLM_FALLBACK_MODEL] if LLM_FALLBACK_MODEL else [])
+    # LLM_FALLBACK_MODEL vergüllə bir neçə model ola bilər: ardıcıl cəhd olunur
+    models = [LLM_MODEL] + [m.strip() for m in (LLM_FALLBACK_MODEL or "").split(",") if m.strip()]
     errors = []
 
     fixed, cut, used = _llm_generate(contents, config, models, errors)
+    if fixed is None and mode == "vision+text":
+        # şəkilli sorğu heç bir modeldə alınmadı (məs. 503): şəkilsiz, yalnız mətnlə təkrar cəhd
+        contents, mode = contents[1:], "text-only"
+        fixed, cut, used = _llm_generate(contents, config, models, errors)
     if fixed is not None and not cut:
         return fixed, None, f"{mode} ({used})"
     if fixed is None:

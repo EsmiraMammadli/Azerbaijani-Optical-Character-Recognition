@@ -697,3 +697,22 @@ def test_reset_link_verifies_and_logs_in_when_required(monkeypatch):
     r = client.post("/api/auth/reset", json={"token": _token_of(sent[0]), "password": "yeni-parol-123"})
     assert r.status_code == 200 and "token" in r.json()   # e-poçt qutusuna çıxışı sübut etdi: təsdiqlənir
     assert client.post("/api/auth/login", json={"username": "berpa-tesdiq1", "password": "yeni-parol-123"}).status_code == 200
+
+
+def test_llm_falls_back_to_text_only(monkeypatch):
+    """Şəkilli sorğu bütün modellərdə alınmasa, şəkilsiz (yalnız mətn) təkrar cəhd olunur."""
+    monkeypatch.setattr(main, "llm", object())
+    monkeypatch.setattr(main, "LLM_FALLBACK_MODEL", "m2, m3")
+    calls = []
+
+    def fake(contents, config, models, errors):
+        calls.append((len(contents), list(models)))
+        if len(contents) == 2:                      # şəkil + mətn
+            errors.append("503")
+            return None, False, None
+        return "XİDMƏTİ VƏ", False, "m2"
+
+    monkeypatch.setattr(main, "_llm_generate", fake)
+    fixed, err, mode = main.fix_with_llm("XİDMaTİ ya", file_bytes=b"x", mime_type="image/png")
+    assert fixed == "XİDMƏTİ VƏ" and err is None and mode.startswith("text-only")
+    assert calls[0][1] == [main.LLM_MODEL, "m2", "m3"]
