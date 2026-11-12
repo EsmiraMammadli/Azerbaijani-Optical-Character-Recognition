@@ -557,6 +557,8 @@ def test_export_xlsx_without_tables():
 def test_normalize_az():
     assert main.normalize_az("Mǝmmǝd") == "Məmməd"
     assert main.normalize_az("Ǝzǝrbaycan") == "Əzərbaycan"
+    assert main.normalize_az("V\u0110 LOGİSTİKA") == "VƏ LOGİSTİKA"   # Đ -> Ə
+    assert main.normalize_az("m\u0111mm\u0111d") == "məmməd"
 
 
 def test_html_reader_strips_tags_and_scripts():

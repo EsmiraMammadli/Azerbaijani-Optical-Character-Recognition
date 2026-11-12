@@ -137,6 +137,7 @@ SYSTEM_PROMPT = """Sən Azərbaycan dili üzrə OCR nəticələrini düzəldən 
 Sənə OCR ilə çıxarılmış mətn (və mümkünsə sənədin şəkli) verilir.
 OCR mətnində tipik səhvlər var:
 - "ə" hərfi tez-tez "o", "a", "e" və ya "ǝ" kimi səhv oxunur (məs. "Mammadli" → "Məmmədli", "Azerbaycan" → "Azərbaycan", "dastayi" → "dəstəyi")
+- BÖYÜK "Ə" hərfi (xüsusilə kiçik, böyük hərflərlə yazılmış başlıq və loqolarda) "O", "Đ", "D", "Ɵ", "3" və ya "E" kimi səhv oxunur (məs. "XİDMOTİ" → "XİDMƏTİ", "VĐ" → "VƏ", "MƏRKƏZ" yerinə "MORKOZ"). Şəkildə Ə görünürsə, onu mütləq Ə kimi yaz.
 - "ı", "İ", "ö", "ü", "ç", "ş", "ğ" hərfləri düşür və ya dəyişir
 - loqo, möhür, imza və suvenirlərdən gələn mənasız simvol sətirləri
 
@@ -465,6 +466,9 @@ def normalize_az(text: str) -> str:
         "\u01dd": "\u0259",        # ǝ -> ə
         "\u018e": "\u018f",        # Ǝ -> Ə
         "\u0131\u0307": "\u0131",  # ı + kombinasiya nöqtəsi -> ı
+        "\u0110": "\u018f",        # Đ -> Ə (kiçik BÖYÜK hərfli yazılarda Ə tez-tez belə oxunur)
+        "\u0111": "\u0259",        # đ -> ə
+        "\u0258": "\u0259",        # ɘ -> ə
     }
     for bad, good in table.items():
         text = text.replace(bad, good)
