@@ -64,7 +64,7 @@ db.init_db()
 ENDPOINT = os.environ["AZURE_DI_ENDPOINT"]
 KEY = os.environ["AZURE_DI_KEY"]
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-LLM_MODEL = os.getenv("LLM_MODEL", "gemini-3.5-flash")
+LLM_MODEL = os.getenv("LLM_MODEL", "gemini-flash-latest")
 LLM_FALLBACK_MODEL = os.getenv("LLM_FALLBACK_MODEL")
 
 # APP_PASSWORD təyin olunubsa hesab rejimi qoşulur: hər istifadəçi öz adı və parolu ilə daxil olur.
